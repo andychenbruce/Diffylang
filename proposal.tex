@@ -1,27 +1,70 @@
 \documentclass{article}
-
 \usepackage{hyperref}
-
-
-\title{F24 290D Project Proposal}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\title{Differential Programming for Automatic Program Correction}
 \author{Andrew Bruce \\ \href{mailto:acbruce@ucsc.edu}{acbruce@ucsc.edu}
   \and Dongjing Wang \\ \href{mailto:dwang114@ucsc.edu}{dwang114@ucsc.edu}
   \and Ming Qi \\ \href{mailto:mqi6@ucsc.edu}{mqi6@ucsc.edu} }
 
 \begin{document}
 \maketitle
+\section*{Motiviation}
+Approximating gradient descent on discreet code. When SWE write tests for their code it can act as a loss function.
 
-\section*{X-decoder}
-How about open vocabulary segmentation? X-decoder/SEEM
-https://x-decoder-vl.github.io/
+\section*{Theory and Implementation}
+This draft of a textbook \cite{blondel2024elementsdifferentiableprogramming} released during summer 2024 provides the background for approximating program data structure operations and control flow as a differentiable functions.\\
+An example is if $\vec{l} \in \mathbb{R}^{n_{\ge 1}}$ is a list and there is some discrete function such as $max$:
+\begin{center}
+  $\mathrm{max} \in \mathbb{R}^{n_{\ge 1}} \rightarrow \mathbb{R}$\\
+  $\mathrm{max}(\vec{l}) = l_{\mathrm{max}}$
+\end{center}
+But when attempting to differentiate
+\begin{center}
+  $$\dfrac{d \mathrm{max}(\vec{l})}{dl_i} = \left\{
+  \begin{array}{ll}
+    1 & l_i = l_{\mathrm{max}} \\
+    0 & \mathrm{otherwise}
+  \end{array} 
+  \right.$$
+\end{center}
+Giving null derivatives when changing components of the list that are not the current maximum element.
+One can define a ``soft'' approximation of this discrete functions from a stoichastic point of view, usually having the advantage of differentiability.
+\begin{center}
+  $\mathrm{max} \approx \mathrm{softmax}$\\
+  $\mathrm{softmax} \in \mathbb{R}^n \rightarrow \mathbb{R}^n$\\
+  $\mathrm{softmax}(\vec{l})_i = \dfrac{e^{l_i}}{\sum_{j=1}^n e^{\vec{l}_j}}$\\
+\end{center}
+This can be generalized to other programming concepts such as logical comparisons, data structures, and control flow.
+\begin{center}
+  \begin{tabular}{ |c|c| }
+    \hline
+    normal & soft variant \\
+    \hline
+    $(\ge) = \mathrm{ge} \in (\mathbb{R} \times \mathbb{R}) \rightarrow \{ 0, 1 \}$ & $\mathrm{softge} \in (\mathbb{R} \times \mathbb{R}) \rightarrow [ 0, 1 ]$\\
+    $(=) = \mathrm{eq} \in (\mathbb{R} \times \mathbb{R}) \rightarrow \{ 0, 1 \}$ & $\mathrm{softeq} \in (\mathbb{R} \times \mathbb{R}) \rightarrow [ 0, 1 ]$\\
+    $\mathrm{ifelse} \in (\{ 0, 1 \} \times F \times F) \rightarrow F$ & $\mathrm{softifelse} \in ([ 0, 1 ] \times F \times F) \rightarrow F$\\
+    $\mathrm{listget} \in (\mathbb{R}^n \times [n] ) \rightarrow \mathbb{R}$ & $\mathrm{softlistget} \in (\mathbb{R}^n \times \Delta^n ) \rightarrow \mathbb{R}$\\
+    $\mathrm{listset} \in (\mathbb{R}^n \times \mathbb{R} \times [n] ) \rightarrow \mathbb{R}^n$ & $\mathrm{softlistset} \in (\mathbb{R}^n \times \mathbb{R} \times \Delta^n ) \rightarrow \mathbb{R}^n$\\
+    $\mathrm{listinsert} \in (\mathbb{R}^n \times \mathbb{R} \times [n+1] ) \rightarrow \mathbb{R}^{n+1}$ & $\mathrm{softlistinsert} \in (\mathbb{R}^n \times \mathbb{R} \times \Delta^{n+1} ) \rightarrow \mathbb{R}^{n+1}$\\
+    \hline
+  \end{tabular}
+  
+\end{center}
+We would have to manually write a the gradient calculation, back propigation and newtons method. Possibly by abusing numpy autodiff.
+\section*{Previous work}
+Previous work mostly done on a purely function IR language called Myia \cite{DBLP:journals/corr/abs-1810-11530}. Does not support list or dictionary operations such as getting and setting. Is an exact transform of the program souce code to a purely functional IR language. Is an exact transformation rather than an approximation meaning that it won't work for a lot of discreet operations or non-smooth or  discontinousfunctions that would have null derivatives.\\
+Did not apply the method for automatic code correction.
 
-\section*{Differential programming}
-% https://web.archive.org/web/20190624180156/https://www.sysml.cc/doc/2018/39.pdf
-Reading textbook \cite{DBLP:journals/corr/abs-1907-07587} about it in another class. \\
-Previous work \cite{Li:2018:DPI} mostly done on a purely function IR language called Mia.
+\section*{Novelty}
+As far as I know no one has done this before.
 
+\section*{Data collection}
+The general algorithm doesn't need data, but when running it on a program it will create an instance of a learning problem that would have data in the form of test cases. We will have to manually write programs and test cases for each program to see if the algorithm converges on the correct answer.
 
+\section*{Limitation}
+Have not verified that you can take the second derivative, the Hessian, for the second order Newtons method $x_{\mathrm{new}} = x_{\mathrm{old}} - [\nabla^2 f]^{-1}(x) \nabla f(x)$.\\
+The gradient is applied on the approximation of a program, not the actual program. When the loss of the approximation converges to zero, it does not necessarily mean that the real program will become correct.
 \bibliographystyle{abbrv}
 \bibliography{refs}
-
 \end{document}
