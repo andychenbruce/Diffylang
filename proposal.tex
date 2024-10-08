@@ -53,8 +53,9 @@ This can be generalized to other programming concepts such as logical comparison
 \end{center}
 We would have to manually write a the gradient calculation, back propigation and newtons method. Possibly by abusing numpy autodiff.
 \section*{Previous work}
-Previous work mostly done on a purely function IR language called Myia \cite{DBLP:journals/corr/abs-1810-11530}. Does not support list or dictionary operations such as getting and setting. Is an exact transform of the program souce code to a purely functional IR language. Is an exact transformation rather than an approximation meaning that it won't work for a lot of discreet operations or non-smooth or  discontinousfunctions that would have null derivatives.\\
-Did not apply the method for automatic code correction.
+One such previous work is ``Zygote'' \cite{DBLP:journals/corr/abs-1907-07587}, a framework for differentiating Julia programs. Another example includes a purely function IR language called ``Myia'' \cite{DBLP:journals/corr/abs-1810-11530}. Does not support list or dictionary operations such as getting and setting. Is an exact transform of the program souce code to a purely functional IR language.\\
+Both of these seem to be an exact transformation rather than an approximation meaning that it won't work for a lot of discreet operations or discontinous functions causing null derivatives as part of the gradient preventing gradient descent from optimizing that parameter any further.
+These both are also used to back propigate from the inputs of the program, but not differentiate with respect to the program parameters itself. They have not been applied with back propigation for for automatic code correction.
 
 \section*{Novelty}
 As far as I know no one has done this before.
