@@ -52,6 +52,28 @@ This can be generalized to other programming concepts such as logical comparison
   
 \end{center}
 We would have to manually write a the gradient calculation, back propigation and newtons method. Possibly by abusing numpy autodiff.
+\section*{Example}
+
+\begin{verbatim}
+void merge_sort(array list, int len){
+    if((len == 0) || (len == 1)){
+        return;
+    }
+    if(len == 2){
+        if(list.get(0) > list.get(1)){
+            int tmp = list.get(0);
+            list.set(0, list.get(1));
+            list.set(1, tmp);
+        }
+        return;
+    }
+    int split_point = len / 2;
+    merge_sort(list, split_point+1);
+    merge_sort(list+split_point, len-split_point);
+    merge(list, split_point);
+}
+\end{verbatim}
+In the above example the code is incorrect because of the first call to \verb|merge_sort| having an index of \verb|split_point+1| rather than \verb|split_point|, an off by one error. After transforming the algorithm into a differentiable function, \verb|merge_sort| $\longrightarrow$ \verb|soft_merge_sort|, the index \verb|split_point+1| can be transformed into \verb|split_point+C|, with the ``weight'' $C = 1$ as a starting value. Then using back propigation to calculate $\nabla L($\verb|soft_merge_sort|$)$, where $L$ is a loss function based of some test cases, should in theory it should be able to correct the off by one error by changing $C$ from $1$ to $0$ through a simple gradient descent algorithm.
 \section*{Previous work}
 One such previous work is ``Zygote'' \cite{DBLP:journals/corr/abs-1907-07587}, a framework for differentiating Julia programs. Another example includes a purely function IR language called ``Myia'' \cite{DBLP:journals/corr/abs-1810-11530}. Does not support list or dictionary operations such as getting and setting. Is an exact transform of the program souce code to a purely functional IR language.\\
 Both of these seem to be an exact transformation rather than an approximation meaning that it won't work for a lot of discreet operations or discontinous functions causing null derivatives as part of the gradient preventing gradient descent from optimizing that parameter any further.
