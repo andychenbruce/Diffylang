@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage[margin=1.0in]{geometry}
+\usepackage[margin=0.5in]{geometry}
 \usepackage{hyperref}
 \usepackage{amsmath}
 \usepackage{amsfonts}
@@ -11,10 +11,55 @@
 
 \begin{document}
 \maketitle
+\pagenumbering{gobble}
 \section*{Motivation}
-We aim to approximate gradient descent on discrete code. When software engineers write tests for their code, these tests can act as a loss function.
+We aim to be able to automatically correct minor errors in programs by approximating gradient descent on discrete imperative code. When software developers write unit tests, these tests can act as training data and a loss function can be automatically derived. The learned corrections can then be fed back to the user saving development time.
+\section*{Example}
+A very simple and non-practical example:
+\begin{verbatim}
+bool is_greater_than_2(double num){
+  if(num > 3.0){
+    return true;
+  }else{
+    retun false;
+  }
+}
+\end{verbatim}
+The code is trivially incorrect. After transforming it into a ``soft'' variant and adding some test cases it could look like:
+\begin{verbatim}
+double is_greater_than_2(double num){
+  return softifelse(softgt(num, 3.0), 1.0, 0.0);
+}
+
+void test_case_1(){
+  assert(is_greater_than_2(2.1) == 1.0);
+}
+void test_case_2(){
+  assert(is_greater_than_2(2.0) == 0.0);
+}
+void test_case_3(){
+  assert(is_greater_than_2(1.9) == 0.0);
+}
+\end{verbatim}
+In the above example the code is incorrect because it is testing if it is greater than 3, rather than 2. We can represent the code as a neural net like:\\
+\begin{tikzpicture}[main/.style = {draw, circle}] 
+  \node[main] (1) {num};
+  \node[main] at (0:4cm) (2)  {\tiny softgt(num, 3)}; 
+  \draw[->] (1) -- node[above]{\tiny $\text{sigmoid}_{\sigma}(num-3)$} (2);
+  \node[main] at (0:10cm) (3)  {\tiny $softifelse(...)$};
+  \draw[->] (2) -- node[above]{\tiny $\text{lerp}(\text{sigmoid}_{\sigma}(...), 1.0, 0.0)$} (3);
+\end{tikzpicture}\\
+Then, for example the 3 (and more) can be replaced by a parameter $C$ which can be trained on using gradient descent, with the loss function specified by the hand written test cases.
+\begin{center}
+  $C_0 = 3, C_{N+1} = C_{n} - \lambda \nabla_C L(C, ...)$
+\end{center}
+This transformation should be applicable to any programs that we can formulat a ``soft'' transformation for, such as sorting algorithms. Fixed length for loops can be unrolled, and while loops can be represented with a possibly infinitely long Markov chain.
+\section*{Synthetic Data Generation}
+The general algorithm would take in data in the form of test cases for a function for each instance of a learning problem. We will have to manually write programs and test cases for each program to see if the algorithm converges on the correct answer. Test cases can be trivially generated from the correct algorithm. We can also generate instances of the learning problem by automatially changing the parameters of a correct program to be incorrect, such as a wrong offset on a list index. Each instance can test if the backpropagation and gradient descent will converge on the correct algorithm giving us feedback on how well it can correct errors.
+\section*{Novelty}
+As far as we know, no one has implemented these soft variants, attempted to use them to correct code, or defined loss functions from unit tests. What we will attempt would a completely new approach.
 \section*{Theory and Implementation}
-This draft of a textbook \cite{blondel2024elementsdifferentiableprogramming} released during summer 2024 provides the background for approximating program data structure operations and control flow as differentiable functions, similar to a neural network.\\
+This draft of a textbook \cite{blondel2024elementsdifferentiableprogramming} released during summer 2024 provides the background for approximating program data structure operations and control flow as differentiable functions, representable as a neural network.\\
 An example is if $\vec{l} \in \mathbb{R}^{n_{\ge 1}}$ is a list and there is some discrete function such as $max$:
 \begin{center}
   $\mathrm{max} \in \mathbb{R}^{n_{\ge 1}} \rightarrow \mathbb{R}$\\
@@ -51,59 +96,12 @@ This can be generalized to other programming concepts such as logical comparison
     \hline
   \end{tabular}
 \end{center}
-Once a program is differentiable and without null derivatives it can be treated just like a neural net. Deep learning techniques such as backpropagation and gradient descent can be applied to programs. We would have to manually write a the gradient calculation, backpropagation and Newton's method. Possibly by leveraging NumPy's automatic differentiation capabilities
-\section*{Example}
-A very simple and non-practical example:
-\begin{verbatim}
-bool is_greater_than_2(double num){
-  if(num > 3.0){
-    return true;
-  }else{
-    retun false;
-  }
-}
-\end{verbatim}
-The code is trivially incorrect. After transforming it into a soft variant, and some test cases it could look like:
-\begin{verbatim}
-double is_greater_than_2(double num){
-  return softifelse(softgt(num, 3.0), 1.0, 0.0);
-}
-
-void test_case_1(){
-  assert(is_greater_than_2(3) == 1.0);
-}
-void test_case_2(){
-  assert(is_greater_than_2(2) == 0.0);
-}
-void test_case_3(){
-  assert(is_greater_than_2(1.9) == 0.0);
-}
-void test_case_4(){
-  assert(is_greater_than_2(-2) == 0.0);
-}
-\end{verbatim}
-In the above example the code is incorrect because it is testing if it is greater than 3, rather than 2. We can represent the code as a neural net like:\\
-\begin{tikzpicture}[main/.style = {draw, circle}] 
-  \node[main] (1) {num};
-  \node[main] at (0:4cm) (2)  {\tiny softgt(num, 3)}; 
-  \draw[->] (1) -- node[above]{\tiny $\text{sigmoid}_{\sigma}(num-3)$} (2);
-  \node[main] at (0:10cm) (3)  {\tiny $softifelse(...)$};
-  \draw[->] (2) -- node[above]{\tiny $\text{lerp}(\text{sigmoid}_{\sigma}(...), 1.0, 0.0)$} (3);
-\end{tikzpicture}
-Then, for example the 3 (and more) can be replaced by a parameter $C$ which can be trained on using gradient descent, with the loss function specified by the hand written test cases.
-\begin{center}
-  $C_0 = 3, C_{N+1} = C_{n} - \lambda \nabla_C L(C, ...)$
-\end{center}
-This transformation should be applicable to any programs that we can formulat a ``soft'' transformation for, such as sorting algorithms. Fixed length for loops can be unrolled, and while loops can be represented with a possibly infinitely long Markov chain.
+Once a program is differentiable and without null derivatives it can be treated just like a neural net. Deep learning techniques such as backpropagation and gradient descent can be applied. We would have to manually write a the gradient calculation, backpropagation, and Newton's method, possibly by leveraging NumPy's automatic differentiation capabilities
 \section*{Previous work}
 One such previous work is ``Zygote'' \cite{DBLP:journals/corr/abs-1907-07587}, a framework for differentiating Julia programs. Another example includes a purely function IR language called ``Myia'' \cite{DBLP:journals/corr/abs-1810-11530}. Both of these have not been used for program correction, and do not support more complex control flows such as list or dictionary operations such as getting and setting. These works seem to focus on an exact differentiation rather than a possibly more usefull approximation. It prevents using discrete operations or discontinous functions causing null derivatives as part of the gradient, preventing gradient descent from optimizing that parameter any further. These both are also used to back propigate from the inputs of the program, but not differentiate with respect to the program parameters itself. They have not been applied with backpropagation for for automatic code correction.
-\section*{Novelty}
-As far as We know no one has implemented this approach before.
-\section*{Synthetic Data Generation}
-The general algorithm would take in data in the form of test cases for a function for each instance of a learning problem. We will have to manually write programs and test cases for each program to see if the algorithm converges on the correct answer. Test cases can be trivially generated from the correct algorithm. We can also generate instances of the learning problem by automatially changing the parameters of a correct program to be incorrect, such as a wrong offset on a list index. Each instance can test if the backpropagation and gradient descent will converge on the correct algorithm.
 \section*{Limitation}
-Have not verified that you can take the second derivative, the Hessian, for the second order Newton's method $x_{\mathrm{new}} = x_{\mathrm{old}} - [\nabla^2 f]^{-1}(x) \nabla f(x)$.\\
-The gradient is applied on the approximation of a program, not the actual program. When the loss of the approximation converges to zero, it does not necessarily mean that the real program will become correct.
+We have not verified that all operations are double differentiable to calculate the Hessian, for the second order Newton's method $x_{\mathrm{new}} = x_{\mathrm{old}} - [\nabla^2 f]^{-1}(x) \nabla f(x)$.\\
+The gradient is calculated on the approximation of a program. When the loss of the approximation converges to zero, it does not necessarily mean that the real program will become correct.
 \bibliographystyle{abbrv}
 \bibliography{refs}
 \end{document}
