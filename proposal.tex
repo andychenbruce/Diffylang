@@ -11,10 +11,10 @@
 
 \begin{document}
 \maketitle
-\section*{Motiviation}
-Approximating gradient descent on discreet code. When SWE write tests for their code it can act as a loss function.
-\section*{Theory and Implemetation}
-This draft of a textbook \cite{blondel2024elementsdifferentiableprogramming} released during summer 2024 provides the background for approximating program data structure operations and control flow as a differentiable functions like a neural network.\\
+\section*{Motivation}
+We aim to approximate gradient descent on discrete code. When software engineers write tests for their code, these tests can act as a loss function.
+\section*{Theory and Implementation}
+This draft of a textbook \cite{blondel2024elementsdifferentiableprogramming} released during summer 2024 provides the background for approximating program data structure operations and control flow as differentiable functions, similar to a neural network.\\
 An example is if $\vec{l} \in \mathbb{R}^{n_{\ge 1}}$ is a list and there is some discrete function such as $max$:
 \begin{center}
   $\mathrm{max} \in \mathbb{R}^{n_{\ge 1}} \rightarrow \mathbb{R}$\\
@@ -30,7 +30,7 @@ But when attempting to differentiate
   \right.$$
 \end{center}
 Giving null derivatives when changing components of the list that are not the current maximum element.
-One can define a ``soft'' approximation of these discrete functions from a stoichastic point of view, usually having the advantage of differentiability.
+One can define a ``soft'' approximation of these discrete functions from a stochastic point of view, usually having the advantage of differentiability.
 \begin{center}
   $\mathrm{max} \approx \mathrm{softmax}$\\
   $\mathrm{softmax} \in \mathbb{R}^n \rightarrow \mathbb{R}^n$\\
@@ -51,7 +51,7 @@ This can be generalized to other programming concepts such as logical comparison
     \hline
   \end{tabular}
 \end{center}
-Once a program is differentiable and without null derivatives it can be treated just like a neural net. Deep learning techniques such as back propigation and gradient descent can be applied to programs. We would have to manually write a the gradient calculation, back propigation and newtons method. Possibly by abusing numpy autodiff.
+Once a program is differentiable and without null derivatives it can be treated just like a neural net. Deep learning techniques such as backpropagation and gradient descent can be applied to programs. We would have to manually write a the gradient calculation, backpropagation and Newton's method. Possibly by leveraging NumPy's automatic differentiation capabilities
 \section*{Example}
 A very simple and non-practical example:
 \begin{verbatim}
@@ -96,13 +96,13 @@ Then, for example the 3 (and more) can be replaced by a parameter $C$ which can 
 \end{center}
 This transformation should be applicable to any programs that we can formulat a ``soft'' transformation for, such as sorting algorithms. Fixed length for loops can be unrolled, and while loops can be represented with a possibly infinitely long Markov chain.
 \section*{Previous work}
-One such previous work is ``Zygote'' \cite{DBLP:journals/corr/abs-1907-07587}, a framework for differentiating Julia programs. Another example includes a purely function IR language called ``Myia'' \cite{DBLP:journals/corr/abs-1810-11530}. Both of these have not been used for program correction, and do not support more complex control flows such as list or dictionary operations such as getting and setting. These works seem to focus on an exact differentiation rather than a possibly more usefull approximation. It prevents using discreet operations or discontinous functions causing null derivatives as part of the gradient, preventing gradient descent from optimizing that parameter any further. These both are also used to back propigate from the inputs of the program, but not differentiate with respect to the program parameters itself. They have not been applied with back propigation for for automatic code correction.
+One such previous work is ``Zygote'' \cite{DBLP:journals/corr/abs-1907-07587}, a framework for differentiating Julia programs. Another example includes a purely function IR language called ``Myia'' \cite{DBLP:journals/corr/abs-1810-11530}. Both of these have not been used for program correction, and do not support more complex control flows such as list or dictionary operations such as getting and setting. These works seem to focus on an exact differentiation rather than a possibly more usefull approximation. It prevents using discrete operations or discontinous functions causing null derivatives as part of the gradient, preventing gradient descent from optimizing that parameter any further. These both are also used to back propigate from the inputs of the program, but not differentiate with respect to the program parameters itself. They have not been applied with backpropagation for for automatic code correction.
 \section*{Novelty}
-As far as I know no one has implemented this approach before.
+As far as We know no one has implemented this approach before.
 \section*{Synthetic Data Generation}
-The general algorithm would take in data in the form of test cases for a function for each instance of a learning problem. We will have to manually write programs and maybe test cases for each program to see if the algorithm converges on the correct answer. Test cases can be trivially generated from the correct algorithm. We can also generate instances of the learning problem by automatially changing the parameters of a correct program to be incorrect, such as a wrong offset on a list index. Each instance can test if the back propigation and gradient descent will converge on the correct algorithm.
+The general algorithm would take in data in the form of test cases for a function for each instance of a learning problem. We will have to manually write programs and test cases for each program to see if the algorithm converges on the correct answer. Test cases can be trivially generated from the correct algorithm. We can also generate instances of the learning problem by automatially changing the parameters of a correct program to be incorrect, such as a wrong offset on a list index. Each instance can test if the backpropagation and gradient descent will converge on the correct algorithm.
 \section*{Limitation}
-Have not verified that you can take the second derivative, the Hessian, for the second order Newtons method $x_{\mathrm{new}} = x_{\mathrm{old}} - [\nabla^2 f]^{-1}(x) \nabla f(x)$.\\
+Have not verified that you can take the second derivative, the Hessian, for the second order Newton's method $x_{\mathrm{new}} = x_{\mathrm{old}} - [\nabla^2 f]^{-1}(x) \nabla f(x)$.\\
 The gradient is applied on the approximation of a program, not the actual program. When the loss of the approximation converges to zero, it does not necessarily mean that the real program will become correct.
 \bibliographystyle{abbrv}
 \bibliography{refs}
