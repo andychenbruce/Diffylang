@@ -7,3 +7,7 @@
 *.fdb_latexmk
 *.fls
 *.gz
+
+# Added by cargo
+
+/target
