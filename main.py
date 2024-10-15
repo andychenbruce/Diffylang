@@ -2,13 +2,10 @@
 import json
 import subprocess
 
-
-
-
-
-
 def main():
     sub_proc = subprocess.run(["cargo", "run", "--quiet"], capture_output=True, text=True)
+
+    print(sub_proc.stdout)
     
     stuff = json.loads(sub_proc.stdout)
 

@@ -9,7 +9,8 @@ pub struct FunctionDefinition {
 pub struct FunctionDefinitionInner {
     pub name: parsel::ast::Ident,
     pub func_type: parsel::ast::Paren<FuncType>,
-    pub arguments: parsel::ast::Paren<parsel::ast::Punctuated<parsel::ast::Ident, Token![,]>>,
+    pub arguments:
+        parsel::ast::Paren<parsel::ast::Punctuated<parsel::ast::Paren<Argument>, Token![,]>>,
     pub func_body: parsel::ast::Paren<Expression>,
 }
 
@@ -18,6 +19,12 @@ pub struct FuncType {
     pub from_type: VarType,
     right_arrow: Token![->],
     pub to_type: VarType,
+}
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub struct Argument {
+    pub varname: parsel::ast::Ident,
+    colon: Token![:],
+    pub vartype: VarType,
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]

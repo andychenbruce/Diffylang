@@ -2,7 +2,7 @@
 pub struct FunctionDefinitionJson {
     pub name: String,
     pub func_type: FuncTypeJson,
-    pub arguments: Vec<String>,
+    pub arguments: Vec<(String, String)>,
     pub body: ExpressionJson,
 }
 
@@ -48,7 +48,10 @@ impl From<crate::parser::FunctionDefinition> for FunctionDefinitionJson {
                 .clone()
                 .into_inner()
                 .into_iter()
-                .map(|x| x.to_string())
+                .map(|x| x.into_inner())
+                .map(|x: crate::parser::Argument| {
+                    (x.varname.to_string(), x.vartype.name.to_string())
+                })
                 .collect(),
             body: value.inner.func_body.clone().into_inner().into(),
         }
