@@ -50,7 +50,7 @@ impl From<crate::parser::FunctionDefinition> for FunctionDefinitionJson {
                 .into_iter()
                 .map(|x| x.into_inner())
                 .map(|x: crate::parser::Argument| {
-                    (x.varname.to_string(), x.vartype.name.to_string())
+                    (x.varname.to_string(), x.vartype.type_name.to_string())
                 })
                 .collect(),
             body: value.inner.func_body.clone().into_inner().into(),
@@ -61,8 +61,8 @@ impl From<crate::parser::FunctionDefinition> for FunctionDefinitionJson {
 impl From<crate::parser::FuncType> for FuncTypeJson {
     fn from(value: crate::parser::FuncType) -> FuncTypeJson {
         FuncTypeJson {
-            from: value.from_type.name.to_string(),
-            to: value.to_type.name.to_string(),
+            from: value.from_type.type_name.to_string(),
+            to: value.to_type.type_name.to_string(),
         }
     }
 }
@@ -70,7 +70,7 @@ impl From<crate::parser::FuncType> for FuncTypeJson {
 impl From<crate::parser::Expression> for ExpressionJson {
     fn from(value: crate::parser::Expression) -> ExpressionJson {
         match value {
-            crate::parser::Expression::Variable(x) => ExpressionJson::Variable(x.name.to_string()),
+            crate::parser::Expression::Variable(x) => ExpressionJson::Variable(x.to_string()),
             crate::parser::Expression::IntegerLit(x) => ExpressionJson::Integer(x.into_inner()),
             crate::parser::Expression::StringLit(x) => ExpressionJson::Str(x.into_inner()),
             crate::parser::Expression::FloatLit(x) => ExpressionJson::Float(x.into_inner().into()),

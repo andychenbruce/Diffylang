@@ -1,5 +1,9 @@
 use parsel::{syn::Token, Parse, ToTokens};
 
+// mod kw {
+//     parsel::custom_keyword!(stuff);
+// }
+
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct FunctionDefinition {
     pub inner: parsel::ast::Bracket<FunctionDefinitionInner>,
@@ -20,6 +24,7 @@ pub struct FuncType {
     right_arrow: Token![->],
     pub to_type: VarType,
 }
+
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct Argument {
     pub varname: parsel::ast::Ident,
@@ -29,12 +34,12 @@ pub struct Argument {
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct VarType {
-    pub name: parsel::ast::Ident,
+    pub type_name: parsel::ast::Ident,
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub enum Expression {
-    Variable(VarType),
+    Variable(parsel::ast::Ident),
     IntegerLit(parsel::ast::LitInt),
     StringLit(parsel::ast::LitStr),
     FloatLit(parsel::ast::LitFloat),
