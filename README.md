@@ -21,7 +21,7 @@ The project is organized as follows:
 ├── .gitignore                  # Git ignore file
 ├── Cargo.lock                  # Cargo lock file for Rust dependencies
 ├── Cargo.toml                  # Cargo configuration file for Rust dependencies
-├── main.py                     # Main Python script
+├── main.py                     # Main Python script 
 ├── README.md                   # Project README file
 └── test.prog                   # Test program file
 ```
