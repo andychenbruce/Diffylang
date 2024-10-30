@@ -1,5 +1,3 @@
-use std::any::type_name;
-
 #[derive(serde::Serialize)]
 pub struct ProgramJson {
     pub functions: Vec<FunctionDefinitionJson>,

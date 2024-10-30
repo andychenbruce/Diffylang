@@ -83,12 +83,11 @@ fn type_check_func(env: TypeEnv, func: &parser::FunctionDefinition) -> Res<TypeE
     let env_with_arguments = func
         .inner
         .arguments
-        .clone()
-        .into_inner()
-        .clone()
-        .into_iter()
-        .map(|x| x.into_inner())
-        .map(|x| Ok((x.varname, Type::Expr(x.vartype.try_into()?))))
+        .as_parts()
+        .1
+        .iter()
+        .map(|x| x.as_parts().1)
+        .map(|x| Ok((x.varname.clone(), Type::Expr(x.clone().vartype.try_into()?))))
         .collect::<Res<Vec<_>>>()?
         .into_iter()
         .fold(env.clone(), |acc, (identifier, type_v)| {
@@ -106,14 +105,15 @@ fn type_check_func(env: TypeEnv, func: &parser::FunctionDefinition) -> Res<TypeE
         first: (
             func.clone().inner.name.clone(),
             Type::Function {
-                from: vec![],
-                to: func
-                    .clone()
+                from: func
                     .inner
-                    .to_type
-                    .clone()
-                    .try_into()
-                    .unwrap(),
+                    .arguments
+                    .as_parts()
+                    .1
+                    .iter()
+                    .map(|x| x.as_parts().1.vartype.clone().try_into().unwrap())
+                    .collect(),
+                to: func.clone().inner.to_type.clone().try_into().unwrap(),
             },
         ),
         rest: Box::new(env),
