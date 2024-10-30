@@ -8,9 +8,8 @@ fn main() {
         parsel::parse_str(&std::fs::read_to_string("test.prog").unwrap()).unwrap();
 
     let val = interpreter::apply_function(program_ast.clone(), "is_greater_than_2", vec![
-        interpreter::Value::Int(10),
-        interpreter::Value::Int(20),
-        interpreter::Value::Int(30)
+        interpreter::Value::Int(2),
+        
     ]);
 
     println!("val = {:?}", val);
