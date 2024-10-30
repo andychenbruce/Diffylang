@@ -2,10 +2,13 @@ use crate::parser;
 
 type Res<A> = Result<A, Box<dyn std::error::Error>>;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum Type {
     Expr(SimpleType),
-    Function { from: SimpleType, to: SimpleType },
+    Function {
+        from: Vec<SimpleType>,
+        to: SimpleType,
+    },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -66,7 +69,17 @@ impl TryFrom<parser::VarType> for SimpleType {
     }
 }
 
-pub fn type_check_func(env: TypeEnv, func: &parser::FunctionDefinition) -> Res<()> {
+pub fn type_check_program(program: &parser::Program) -> Res<TypeEnv> {
+    Ok(program
+        .functions
+        .clone()
+        .into_iter()
+        .fold(TypeEnv::empty(), |acc, function| {
+            type_check_func(acc, &function).unwrap()
+        }))
+}
+
+fn type_check_func(env: TypeEnv, func: &parser::FunctionDefinition) -> Res<TypeEnv> {
     let env_with_arguments = func
         .inner
         .arguments
@@ -78,7 +91,7 @@ pub fn type_check_func(env: TypeEnv, func: &parser::FunctionDefinition) -> Res<(
         .map(|x| Ok((x.varname, Type::Expr(x.vartype.try_into()?))))
         .collect::<Res<Vec<_>>>()?
         .into_iter()
-        .fold(env, |acc, (identifier, type_v)| {
+        .fold(env.clone(), |acc, (identifier, type_v)| {
             acc.add_type(identifier, type_v)
         });
     let expr_type = find_expr_type(
@@ -86,10 +99,25 @@ pub fn type_check_func(env: TypeEnv, func: &parser::FunctionDefinition) -> Res<(
         func.inner.func_body.clone().into_inner(),
     )?;
 
-    if expr_type != func.inner.func_type.to_type.clone().try_into()? {
+    if expr_type != func.inner.to_type.clone().try_into()? {
         return Err("func type signature mismatch".into());
     }
-    Ok(())
+    Ok(TypeEnv::Rest {
+        first: (
+            func.clone().inner.name.clone(),
+            Type::Function {
+                from: vec![],
+                to: func
+                    .clone()
+                    .inner
+                    .to_type
+                    .clone()
+                    .try_into()
+                    .unwrap(),
+            },
+        ),
+        rest: Box::new(env),
+    })
 }
 
 fn find_expr_type(env: TypeEnv, expr: parser::Expression) -> Res<SimpleType> {

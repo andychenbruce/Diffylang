@@ -1,15 +1,16 @@
+use std::any::type_name;
+
 #[derive(serde::Serialize)]
-pub struct FunctionDefinitionJson {
-    pub name: String,
-    pub func_type: FuncTypeJson,
-    pub arguments: Vec<(String, String)>,
-    pub body: ExpressionJson,
+pub struct ProgramJson {
+    pub functions: Vec<FunctionDefinitionJson>,
 }
 
 #[derive(serde::Serialize)]
-pub struct FuncTypeJson {
-    pub from: String,
-    pub to: String,
+pub struct FunctionDefinitionJson {
+    pub name: String,
+    pub arguments: Vec<(String, String)>,
+    pub to_type: String,
+    pub body: ExpressionJson,
 }
 
 #[derive(serde::Serialize)]
@@ -37,11 +38,19 @@ pub struct LetBindJson {
     pub value: ExpressionJson,
 }
 
+impl From<crate::parser::Program> for ProgramJson {
+    fn from(value: crate::parser::Program) -> Self {
+        Self {
+            functions: value.functions.into_iter().map(|x| x.into()).collect(),
+        }
+    }
+}
+
 impl From<crate::parser::FunctionDefinition> for FunctionDefinitionJson {
     fn from(value: crate::parser::FunctionDefinition) -> FunctionDefinitionJson {
         FunctionDefinitionJson {
             name: value.inner.name.to_string(),
-            func_type: value.inner.func_type.clone().into_inner().into(),
+            to_type: value.inner.to_type.type_name.to_string(),
             arguments: value
                 .inner
                 .arguments
@@ -54,15 +63,6 @@ impl From<crate::parser::FunctionDefinition> for FunctionDefinitionJson {
                 })
                 .collect(),
             body: value.inner.func_body.clone().into_inner().into(),
-        }
-    }
-}
-
-impl From<crate::parser::FuncType> for FuncTypeJson {
-    fn from(value: crate::parser::FuncType) -> FuncTypeJson {
-        FuncTypeJson {
-            from: value.from_type.type_name.to_string(),
-            to: value.to_type.type_name.to_string(),
         }
     }
 }

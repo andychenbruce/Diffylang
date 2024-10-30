@@ -1,4 +1,4 @@
-use crate::parser::FunctionDefinition;
+use crate::parser::Program;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Value {
@@ -31,7 +31,11 @@ impl Env {
     }
 }
 
-pub fn apply_function(func: FunctionDefinition, arguments: Vec<Value>) -> Value{
+pub fn apply_function(program: Program, func_name: &str, arguments: Vec<Value>) -> Value {
+    let _type_env: crate::type_checker::TypeEnv =
+        crate::type_checker::type_check_program(&program).unwrap();
+
+    let func = program.find_func(func_name);
     let thing = func
         .inner
         .arguments
@@ -63,7 +67,9 @@ fn eval(env: Env, expr: crate::parser::Expression) -> Value {
         crate::parser::Expression::Addition(ad) => {
             eval_addition(env, *ad.left_side.clone(), *ad.right_side.clone())
         }
-        crate::parser::Expression::Subtraction(sb) => eval_subtraction(env, *sb.left_side.clone(), *sb.right_side.clone()),
+        crate::parser::Expression::Subtraction(sb) => {
+            eval_subtraction(env, *sb.left_side.clone(), *sb.right_side.clone())
+        }
         crate::parser::Expression::Multiplication(_) => todo!(),
         crate::parser::Expression::Division(_) => todo!(),
         crate::parser::Expression::Equality(_) => todo!(),

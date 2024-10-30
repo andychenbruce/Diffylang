@@ -1,8 +1,21 @@
 use parsel::{syn::Token, Parse, ToTokens};
 
-// mod kw {
-//     parsel::custom_keyword!(stuff);
-// }
+
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub struct Program {
+    pub functions: parsel::ast::Punctuated<FunctionDefinition, Token![;]>,
+}
+
+impl Program{
+    pub fn find_func(&self, func_name: &str) -> FunctionDefinition{
+        for func in self.clone().functions.into_iter(){
+            if func.inner.name.to_string() == func_name{
+                return func;
+            }
+        }
+        unreachable!()
+    }
+}
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct FunctionDefinition {
@@ -12,17 +25,11 @@ pub struct FunctionDefinition {
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct FunctionDefinitionInner {
     pub name: parsel::ast::Ident,
-    pub func_type: parsel::ast::Paren<FuncType>,
     pub arguments:
         parsel::ast::Paren<parsel::ast::Punctuated<parsel::ast::Paren<Argument>, Token![,]>>,
-    pub func_body: parsel::ast::Paren<Expression>,
-}
-
-#[derive(Clone, Debug, Parse, ToTokens)]
-pub struct FuncType {
-    pub from_type: VarType,
-    right_arrow: Token![->],
+    pub right_arrow: Token![->],
     pub to_type: VarType,
+    pub func_body: parsel::ast::Paren<Expression>,
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]
