@@ -1,20 +1,8 @@
 use parsel::{syn::Token, Parse, ToTokens};
 
-
 #[derive(Clone, Debug, Parse, ToTokens)]
-pub struct Program {
+pub struct ProgramParseTree {
     pub functions: parsel::ast::Punctuated<FunctionDefinition, Token![;]>,
-}
-
-impl Program{
-    pub fn find_func(&self, func_name: &str) -> FunctionDefinition{
-        for func in self.clone().functions.into_iter(){
-            if func.inner.name.to_string() == func_name{
-                return func;
-            }
-        }
-        unreachable!()
-    }
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]

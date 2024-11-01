@@ -1,8 +1,69 @@
-use crate::parser;
+use parsel::Display;
 
-type Res<A> = Result<A, Box<dyn std::error::Error>>;
+use crate::ast;
 
-#[derive(Clone)]
+#[derive(Debug)]
+pub enum TypeError {
+    UnknownType(ast::TypeName),
+    FuncTypeMismatch {
+        body_type_expected: SimpleType,
+        body_type_found: SimpleType,
+    },
+    UnknownVariable {
+        span: parsel::Span,
+        ident: ast::Identifier,
+    },
+    BadComparison {
+        span: parsel::Span,
+        left: SimpleType,
+        right: SimpleType,
+    },
+    BadArithmetic {
+        left: SimpleType,
+        right: SimpleType,
+        span: parsel::Span,
+    },
+}
+
+impl ToString for TypeError {
+    fn to_string(&self) -> String {
+        match self {
+            TypeError::UnknownType(typename) => format!("unknown type {}", typename.0),
+            TypeError::FuncTypeMismatch {
+                body_type_expected,
+                body_type_found,
+            } => format!(
+                "function type mismatch, expected {:?}, found {:?}",
+                body_type_expected, body_type_found
+            ),
+            TypeError::UnknownVariable { span, ident } => {
+                let location = span.start();
+                format!(
+                    "Unknown variable on line {} col {}: {}",
+                    location.line, location.column, ident.0
+                )
+            }
+            TypeError::BadComparison { span, left, right } => {
+                let location = span.start();
+                format!(
+                    "line {} col {}: could not compare types {:?} and {:?}",
+                    location.line, location.column, left, right
+                )
+            }
+            TypeError::BadArithmetic { left, right, span } => {
+                let location = span.start();
+                format!(
+                    "line {} col {}: could not apply arithmetic on types {:?} and {:?}",
+                    location.line, location.column, left, right
+                )
+            }
+        }
+    }
+}
+
+type Res<A> = Result<A, TypeError>;
+
+#[derive(Clone, Debug)]
 pub enum Type {
     Expr(SimpleType),
     Function {
@@ -24,7 +85,7 @@ pub enum SimpleType {
 pub enum TypeEnv {
     End,
     Rest {
-        first: (parsel::ast::Ident, Type),
+        first: (ast::Identifier, Type),
         rest: Box<TypeEnv>,
     },
 }
@@ -33,13 +94,13 @@ impl TypeEnv {
     pub fn empty() -> Self {
         Self::End
     }
-    fn add_type(&self, ident: parsel::ast::Ident, type_v: Type) -> Self {
+    fn add_type(&self, ident: ast::Identifier, type_v: Type) -> Self {
         TypeEnv::Rest {
             first: (ident, type_v),
             rest: Box::new(self.clone()),
         }
     }
-    fn find_var_type(&self, ident: &parsel::ast::Ident) -> Option<SimpleType> {
+    fn find_var_type(&self, ident: &ast::Identifier) -> Option<SimpleType> {
         match self {
             TypeEnv::End => None,
             TypeEnv::Rest { first, rest } => {
@@ -56,137 +117,115 @@ impl TypeEnv {
     }
 }
 
-impl TryFrom<parser::VarType> for SimpleType {
-    type Error = Box<dyn std::error::Error>;
+impl TryFrom<&ast::TypeName> for SimpleType {
+    type Error = TypeError;
 
-    fn try_from(value: parser::VarType) -> Res<Self> {
-        match value.type_name.to_string().as_str() {
+    fn try_from(value: &ast::TypeName) -> Res<Self> {
+        match value.0.as_str() {
             "int" => Ok(SimpleType::Int),
             "float" => Ok(SimpleType::Float),
             "bool" => Ok(SimpleType::Bool),
-            a => Err(format!("unknown type: {}", a).into()),
+            _ => Err(TypeError::UnknownType(value.clone())),
         }
     }
 }
 
-pub fn type_check_program(program: &parser::Program) -> Res<TypeEnv> {
+pub fn type_check_program(program: &ast::Program) -> Res<TypeEnv> {
     Ok(program
         .functions
-        .clone()
-        .into_iter()
+        .iter()
         .fold(TypeEnv::empty(), |acc, function| {
-            type_check_func(acc, &function).unwrap()
+            type_check_func(acc, function).unwrap()
         }))
 }
 
-fn type_check_func(env: TypeEnv, func: &parser::FunctionDefinition) -> Res<TypeEnv> {
+fn type_check_func(env: TypeEnv, func: &ast::FunctionDefinition) -> Res<TypeEnv> {
     let env_with_arguments = func
-        .inner
         .arguments
-        .as_parts()
-        .1
         .iter()
-        .map(|x| x.as_parts().1)
-        .map(|x| Ok((x.varname.clone(), Type::Expr(x.clone().vartype.try_into()?))))
-        .collect::<Res<Vec<_>>>()?
-        .into_iter()
+        .map(|x| (x.0.clone(), Type::Expr((&x.1).try_into().unwrap())))
         .fold(env.clone(), |acc, (identifier, type_v)| {
             acc.add_type(identifier, type_v)
         });
-    let expr_type = find_expr_type(
-        env_with_arguments,
-        func.inner.func_body.clone().into_inner(),
-    )?;
+    let expr_type = find_expr_type(env_with_arguments, &func.body)?;
 
-    if expr_type != func.inner.to_type.clone().try_into()? {
-        return Err("func type signature mismatch".into());
+    let expected_to_type = (&func.to_type).try_into()?;
+
+    if expr_type != expected_to_type {
+        return Err(TypeError::FuncTypeMismatch {
+            body_type_expected: expected_to_type,
+            body_type_found: expr_type,
+        });
     }
     Ok(TypeEnv::Rest {
         first: (
-            func.clone().inner.name.clone(),
+            func.name.clone(),
             Type::Function {
                 from: func
-                    .inner
                     .arguments
-                    .as_parts()
-                    .1
                     .iter()
-                    .map(|x| x.as_parts().1.vartype.clone().try_into().unwrap())
+                    .map(|x| (&x.1).try_into().unwrap())
                     .collect(),
-                to: func.clone().inner.to_type.clone().try_into().unwrap(),
+                to: (&func.to_type).try_into().unwrap(),
             },
         ),
         rest: Box::new(env),
     })
 }
 
-fn find_expr_type(env: TypeEnv, expr: parser::Expression) -> Res<SimpleType> {
+fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
     match expr {
-        parser::Expression::Variable(var) => Ok(env.find_var_type(&var).ok_or::<Box<
-            dyn std::error::Error,
-        >>(
-            format!("unknown variable type: {}", var).into(),
-        )?),
-        parser::Expression::IntegerLit(_) => Ok(SimpleType::Int),
-        parser::Expression::StringLit(_) => Ok(SimpleType::String),
-        parser::Expression::FloatLit(_) => Ok(SimpleType::Float),
-        parser::Expression::Addition(x) => {
-            let thing = x.into_inner();
-            find_arithmtic_type(env, *thing.left_side, *thing.right_side)
+        ast::Expression::Variable { ident, span } => {
+            Ok(env
+                .find_var_type(&ident)
+                .ok_or(TypeError::UnknownVariable {
+                    span: span.clone(),
+                    ident: ident.clone(),
+                })?)
         }
-        parser::Expression::Subtraction(x) => {
-            let thing = x.into_inner();
-            find_arithmtic_type(env, *thing.left_side, *thing.right_side)
-        }
-        parser::Expression::Multiplication(x) => {
-            let thing = x.into_inner();
-            find_arithmtic_type(env, *thing.left_side, *thing.right_side)
-        }
-        parser::Expression::Division(x) => {
-            let thing = x.into_inner();
-            find_arithmtic_type(env, *thing.left_side, *thing.right_side)
-        }
-        parser::Expression::Equality(x) => {
-            let thing = x.into_inner();
-            validate_comparison(env, *thing.left_side, *thing.right_side)?;
-            Ok(SimpleType::Bool)
-        }
-        parser::Expression::GreaterThan(x) => {
-            let thing = x.into_inner();
-            validate_comparison(env, *thing.left_side, *thing.right_side)?;
-            Ok(SimpleType::Bool)
-        }
-        parser::Expression::LessThan(x) => {
-            let thing = x.into_inner();
-            validate_comparison(env, *thing.left_side, *thing.right_side)?;
-            Ok(SimpleType::Bool)
-        }
-        parser::Expression::ExprWhere {
-            bindings,
-            where_token: _,
-            inner,
+        ast::Expression::Integer(_) => Ok(SimpleType::Int),
+        ast::Expression::Str(_) => Ok(SimpleType::String),
+        ast::Expression::Float(_) => Ok(SimpleType::Float),
+        ast::Expression::FuncApplication {
+            func_name,
+            args,
+            span,
         } => {
+            if ["__add", "__sub"].contains(&func_name.0.as_str()) {
+                assert!(args.len() == 2);
+                return find_arithmtic_type(env, &args[0], &args[1], *span);
+            }
+            if ["__gt", "__lt"].contains(&func_name.0.as_str()) {
+                assert!(args.len() == 2);
+                validate_comparison(env, &args[0], &args[1], *span).unwrap();
+                return Ok(SimpleType::Bool);
+            }
+
+            todo!()
+        }
+        ast::Expression::ExprWhere { bindings, inner } => {
             let env_with_bindings = bindings
-                .into_inner()
-                .clone()
-                .into_iter()
-                .map(|x| x.into_inner())
-                .map(|x| Ok((x.name, Type::Expr(find_expr_type(env.clone(), *x.value)?))))
-                .collect::<Res<Vec<_>>>()?
-                .into_iter()
-                .fold(env, |acc, (identifier, type_v)| {
-                    acc.add_type(identifier, type_v)
+                .iter()
+                .map(|x| {
+                    (
+                        &x.ident,
+                        Type::Expr(find_expr_type(env.clone(), &x.value).unwrap()),
+                    )
+                })
+                .fold(env.clone(), |acc, (identifier, type_v)| {
+                    acc.add_type(identifier.clone(), type_v)
                 });
 
-            find_expr_type(env_with_bindings, *inner)
+            find_expr_type(env_with_bindings, inner)
         }
     }
 }
 
 fn validate_comparison(
     env: TypeEnv,
-    left: parser::Expression,
-    right: parser::Expression,
+    left: &ast::Expression,
+    right: &ast::Expression,
+    span: parsel::Span,
 ) -> Res<()> {
     match (
         find_expr_type(env.clone(), left)?,
@@ -196,18 +235,15 @@ fn validate_comparison(
         (SimpleType::Int, SimpleType::Float) => Ok(()),
         (SimpleType::Float, SimpleType::Int) => Ok(()),
         (SimpleType::Float, SimpleType::Float) => Ok(()),
-        (left_type, right_type) => Err(format!(
-            "cannot perform comparison on types {:?} and {:?}",
-            left_type, right_type
-        )
-        .into()),
+        (left, right) => Err(TypeError::BadComparison { left, right, span }),
     }
 }
 
 fn find_arithmtic_type(
     env: TypeEnv,
-    left: parser::Expression,
-    right: parser::Expression,
+    left: &ast::Expression,
+    right: &ast::Expression,
+    span: parsel::Span,
 ) -> Res<SimpleType> {
     match (
         find_expr_type(env.clone(), left)?,
@@ -217,10 +253,6 @@ fn find_arithmtic_type(
         (SimpleType::Int, SimpleType::Float) => Ok(SimpleType::Float),
         (SimpleType::Float, SimpleType::Int) => Ok(SimpleType::Float),
         (SimpleType::Float, SimpleType::Float) => Ok(SimpleType::Float),
-        (left_type, right_type) => Err(format!(
-            "cannot perform arithmetic on types {:?} and {:?}",
-            left_type, right_type
-        )
-        .into()),
+        (left, right) => Err(TypeError::BadArithmetic { left, right, span }),
     }
 }

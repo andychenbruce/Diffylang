@@ -1,20 +1,22 @@
-mod json_generator;
+// mod json_generator;
+mod ast;
+mod interpreter;
 mod parser;
 mod type_checker;
-mod interpreter;
 
 fn main() {
-    let program_ast: parser::Program =
+    let program_parse_tree: parser::ProgramParseTree =
         parsel::parse_str(&std::fs::read_to_string("test.prog").unwrap()).unwrap();
 
-    let val = interpreter::apply_function(program_ast.clone(), "is_greater_than_2", vec![
-        interpreter::Value::Int(2),
-        
-    ]);
+    let program_ast = program_parse_tree.into();
+
+    let val = interpreter::apply_function(
+        &program_ast,
+        "is_greater_than_2",
+        vec![interpreter::Value::Int(3)],
+    );
 
     println!("val = {:?}", val);
-    
-    let json: json_generator::ProgramJson = program_ast.into();
 
-    println!("{}", serde_json::to_string_pretty(&json).unwrap());
+    println!("{}", serde_json::to_string_pretty(&program_ast).unwrap());
 }
