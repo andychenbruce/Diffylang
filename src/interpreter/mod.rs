@@ -113,10 +113,14 @@ fn eval_greater_than(env: Env, left: &ast::Expression, right: &ast::Expression) 
     let right_val = eval(env.clone(), right);
 
     match (left_val, right_val) {
-        (Value::Int(a), Value::Int(b)) => Value::Bool(a > b),
-        (Value::Float(a), Value::Int(b)) => Value::Bool(a > (b as f64)),
-        (Value::Int(a), Value::Float(b)) => Value::Bool((a as f64) > b),
-        (Value::Float(a), Value::Float(b)) => Value::Bool(a > b),
+        (Value::Float(a), Value::Float(b)) => Value::Float(softgt(a, b)),
+        (Value::Int(a), Value::Float(b)) => Value::Float(softgt(a as f64, b)),
+        (Value::Float(a), Value::Int(b)) => Value::Float(softgt(a, b as f64)),
+        (Value::Int(a), Value::Int(b)) => Value::Bool(a > b),  // Preserve integer comparisons
         _ => unreachable!(),
     }
+}
+
+pub fn softgt(x: f64, c: f64) -> f64 {
+    1.0 / (1.0 + (-1.0 * (x - c)).exp())
 }
