@@ -15,19 +15,25 @@ enum Gradient {
 }
 
 #[derive(Clone)]
-enum SoftEnv {
+struct SoftEnv<'a> {
+    program: &'a ast::Program,
+    vars: SoftEnvVars,
+}
+
+#[derive(Clone)]
+enum SoftEnvVars {
     End,
     Rest {
         first: (ast::Identifier, SoftValue),
-        rest: Box<SoftEnv>,
+        rest: Box<SoftEnvVars>,
     },
 }
 
-impl SoftEnv {
+impl SoftEnvVars {
     fn lookup_var(&self, var_name: &ast::Identifier) -> SoftValue {
         match self {
-            SoftEnv::End => unreachable!(),
-            SoftEnv::Rest { first, rest } => {
+            SoftEnvVars::End => unreachable!(),
+            SoftEnvVars::Rest { first, rest } => {
                 if first.0 == *var_name {
                     first.1
                 } else {
@@ -38,7 +44,7 @@ impl SoftEnv {
     }
 }
 
-pub fn soft_apply_function(
+pub fn soft_run_function(
     program: &ast::Program,
     func_name: &str,
     arguments: Vec<SoftValue>,
@@ -46,7 +52,18 @@ pub fn soft_apply_function(
     let _type_env: crate::type_checker::TypeEnv =
         crate::type_checker::type_check_program(program).unwrap();
 
-    let func = program.find_func(func_name);
+    soft_apply_function(
+        SoftEnv {
+            program,
+            vars: SoftEnvVars::End,
+        },
+        func_name,
+        arguments,
+    )
+}
+
+fn soft_apply_function(env: SoftEnv, func_name: &str, arguments: Vec<SoftValue>) -> SoftValue {
+    let func = env.program.find_func(func_name);
 
     assert!(arguments.len() == func.arguments.len());
 
@@ -54,17 +71,23 @@ pub fn soft_apply_function(
         .into_iter()
         .zip(func.arguments.iter())
         .map(|(arg_val, arg)| (arg.0.clone(), arg_val))
-        .fold(SoftEnv::End, |acc, x| SoftEnv::Rest {
+        .fold(SoftEnvVars::End, |acc, x| SoftEnvVars::Rest {
             first: x,
             rest: Box::new(acc),
         });
 
-    soft_eval(env_with_args, &func.body)
+    soft_eval(
+        SoftEnv {
+            program: env.program,
+            vars: env_with_args,
+        },
+        &func.body,
+    )
 }
 
 fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
     match expr {
-        ast::Expression::Variable { ident, span: _ } => env.lookup_var(ident),
+        ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
         ast::Expression::Integer(x) => SoftValue::Int(*x as f64),
         ast::Expression::Str(_) => todo!(),
         ast::Expression::Float(x) => SoftValue::Float(*x),
@@ -80,15 +103,34 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
             "__eq" => todo!(),
             "__gt" => eval_soft_greater_than(env, &args[0], &args[1]),
             "__lt" => todo!(),
-            _ => todo!(),
+            func_name => soft_apply_function(
+                env.clone(),
+                func_name,
+                args.iter().map(|x| soft_eval(env.clone(), x)).collect(),
+            ),
         },
         ast::Expression::ExprWhere { bindings, inner } => {
-            let new_env = bindings.iter().fold(env, |acc, x| SoftEnv::Rest {
-                first: (x.ident.clone(), soft_eval(acc.clone(), &x.value)),
+            let new_env = bindings.iter().fold(env.vars, |acc, x| SoftEnvVars::Rest {
+                first: (
+                    x.ident.clone(),
+                    soft_eval(
+                        SoftEnv {
+                            program: env.program,
+                            vars: acc.clone(),
+                        },
+                        &x.value,
+                    ),
+                ),
                 rest: Box::new(acc),
             });
 
-            soft_eval(new_env, inner)
+            soft_eval(
+                SoftEnv {
+                    program: env.program,
+                    vars: new_env,
+                },
+                inner,
+            )
         }
     }
 }

@@ -20,9 +20,9 @@ fn main() {
 
     println!("val = {:?}", val);
 
-    let soft_val = interpreter_soft::soft_apply_function(
+    let soft_val = interpreter_soft::soft_run_function(
         &program_ast,
-        "is_greater_than_2",
+        "test",
         vec![interpreter_soft::SoftValue::Int(3.0)],
     );
     if let interpreter_soft::SoftValue::Bool(x) = soft_val {
