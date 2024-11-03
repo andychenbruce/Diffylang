@@ -5,16 +5,17 @@ mod parser;
 mod type_checker;
 
 fn main() {
-    let program_parse_tree: parser::ProgramParseTree =
-        parsel::parse_str(&std::fs::read_to_string("test.prog").unwrap()).unwrap();
+    let program_parse_tree_result =
+        parsel::parse_str(&std::fs::read_to_string("test.prog").unwrap());
+
+    let program_parse_tree: parser::ProgramParseTree = match program_parse_tree_result {
+        Ok(x) => x,
+        Err(err) => panic!("bruh at {:?}: {:?}", err.span().start(), err),
+    };
 
     let program_ast = program_parse_tree.into();
 
-    let val = interpreter::apply_function(
-        &program_ast,
-        "is_greater_than_2",
-        vec![interpreter::Value::Int(3)],
-    );
+    let val = interpreter::run_function(&program_ast, "test", vec![interpreter::Value::Int(3)]);
     assert!(val == interpreter::Value::Bool(true));
 
     println!("val = {:?}", val);

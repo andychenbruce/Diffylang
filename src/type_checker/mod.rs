@@ -250,7 +250,7 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 assert!(find_expr_type(env.clone(), expr)? == expected);
             }
 
-            todo!()
+            Ok(function_type.to)
         }
         ast::Expression::ExprWhere { bindings, inner } => {
             let env_with_bindings = bindings

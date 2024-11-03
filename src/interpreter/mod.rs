@@ -8,19 +8,25 @@ pub enum Value {
 }
 
 #[derive(Clone)]
-enum Env {
+struct Env<'a> {
+    program: &'a ast::Program,
+    vars: EnvVars,
+}
+
+#[derive(Clone)]
+enum EnvVars {
     End,
     Rest {
         first: (ast::Identifier, Value),
-        rest: Box<Env>,
+        rest: Box<EnvVars>,
     },
 }
 
-impl Env {
+impl EnvVars {
     fn lookup_var(&self, var_name: &ast::Identifier) -> Value {
         match self {
-            Env::End => unreachable!(),
-            Env::Rest { first, rest } => {
+            EnvVars::End => unreachable!(),
+            EnvVars::Rest { first, rest } => {
                 if first.0 == *var_name {
                     first.1
                 } else {
@@ -31,11 +37,22 @@ impl Env {
     }
 }
 
-pub fn apply_function(program: &ast::Program, func_name: &str, arguments: Vec<Value>) -> Value {
+pub fn run_function(program: &ast::Program, func_name: &str, arguments: Vec<Value>) -> Value {
     let _type_env: crate::type_checker::TypeEnv =
         crate::type_checker::type_check_program(program).unwrap();
 
-    let func = program.find_func(func_name);
+    apply_function(
+        Env {
+            program,
+            vars: EnvVars::End,
+        },
+        func_name,
+        arguments,
+    )
+}
+
+fn apply_function(env: Env, func_name: &str, arguments: Vec<Value>) -> Value {
+    let func = env.program.find_func(func_name);
 
     assert!(arguments.len() == func.arguments.len());
 
@@ -43,17 +60,23 @@ pub fn apply_function(program: &ast::Program, func_name: &str, arguments: Vec<Va
         .into_iter()
         .zip(func.arguments.iter())
         .map(|(arg_val, arg)| (arg.0.clone(), arg_val))
-        .fold(Env::End, |acc, x| Env::Rest {
+        .fold(EnvVars::End, |acc, x| EnvVars::Rest {
             first: x,
             rest: Box::new(acc),
         });
 
-    eval(env_with_args, &func.body)
+    eval(
+        Env {
+            program: env.program,
+            vars: env_with_args,
+        },
+        &func.body,
+    )
 }
 
 fn eval(env: Env, expr: &ast::Expression) -> Value {
     match expr {
-        ast::Expression::Variable { ident, span: _ } => env.lookup_var(ident),
+        ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
         ast::Expression::Integer(x) => Value::Int(*x),
         ast::Expression::Str(_) => todo!(),
         ast::Expression::Float(x) => Value::Float(*x),
@@ -69,15 +92,34 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
             "__eq" => todo!(),
             "__gt" => eval_greater_than(env, &args[0], &args[1]),
             "__lt" => todo!(),
-            _ => todo!(),
+            func_name => apply_function(
+                env.clone(),
+                func_name,
+                args.iter().map(|x| eval(env.clone(), x)).collect(),
+            ),
         },
         ast::Expression::ExprWhere { bindings, inner } => {
-            let new_env = bindings.iter().fold(env, |acc, x| Env::Rest {
-                first: (x.ident.clone(), eval(acc.clone(), &x.value)),
+            let new_env = bindings.iter().fold(env.vars, |acc, x| EnvVars::Rest {
+                first: (
+                    x.ident.clone(),
+                    eval(
+                        Env {
+                            program: env.program,
+                            vars: acc.clone(),
+                        },
+                        &x.value,
+                    ),
+                ),
                 rest: Box::new(acc),
             });
 
-            eval(new_env, inner)
+            eval(
+                Env {
+                    program: env.program,
+                    vars: new_env,
+                },
+                inner,
+            )
         }
     }
 }

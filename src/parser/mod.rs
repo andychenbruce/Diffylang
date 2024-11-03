@@ -34,15 +34,15 @@ pub struct VarType {
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub enum Expression {
-    Variable(parsel::ast::Ident),
-    IntegerLit(parsel::ast::LitInt),
-    StringLit(parsel::ast::LitStr),
-    FloatLit(parsel::ast::LitFloat),
     FunctionApplication {
         func_name: parsel::ast::Ident,
         #[parsel(recursive)]
         args: parsel::ast::Paren<parsel::ast::Punctuated<Box<Expression>, Token![,]>>,
     },
+    Variable(parsel::ast::Ident),
+    IntegerLit(parsel::ast::LitInt),
+    StringLit(parsel::ast::LitStr),
+    FloatLit(parsel::ast::LitFloat),
     Addition(parsel::ast::Paren<BinaryOp<Token![+]>>),
     Subtraction(parsel::ast::Paren<BinaryOp<Token![-]>>),
     Multiplication(parsel::ast::Paren<BinaryOp<Token![*]>>),
