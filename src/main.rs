@@ -1,8 +1,8 @@
 mod ast;
-mod parser;
-mod type_checker;
 mod interpreter;
 mod interpreter_soft;
+mod parser;
+mod type_checker;
 
 fn main() {
     let program_parse_tree: parser::ProgramParseTree =
@@ -15,10 +15,19 @@ fn main() {
         "is_greater_than_2",
         vec![interpreter::Value::Int(3)],
     );
+    assert!(val == interpreter::Value::Bool(true));
 
     println!("val = {:?}", val);
 
-    println!("{}", serde_json::to_string_pretty(&program_ast).unwrap());
+    let soft_val = interpreter_soft::soft_apply_function(
+        &program_ast,
+        "is_greater_than_2",
+        vec![interpreter_soft::SoftValue::Int(3.0)],
+    );
+
+    println!("soft val = {:?}", soft_val);
+
+    // println!("{}", serde_json::to_string_pretty(&program_ast).unwrap());
 
     // Calling softgt using the module path
     let result1 = interpreter_soft::softgt(3.0, 2.0); // Should be close to 1

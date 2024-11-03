@@ -38,6 +38,11 @@ pub enum Expression {
     IntegerLit(parsel::ast::LitInt),
     StringLit(parsel::ast::LitStr),
     FloatLit(parsel::ast::LitFloat),
+    FunctionApplication {
+        func_name: parsel::ast::Ident,
+        #[parsel(recursive)]
+        args: parsel::ast::Paren<parsel::ast::Punctuated<Box<Expression>, Token![,]>>,
+    },
     Addition(parsel::ast::Paren<BinaryOp<Token![+]>>),
     Subtraction(parsel::ast::Paren<BinaryOp<Token![-]>>),
     Multiplication(parsel::ast::Paren<BinaryOp<Token![*]>>),

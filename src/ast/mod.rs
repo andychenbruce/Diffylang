@@ -9,8 +9,6 @@ pub struct TypeName(pub String);
 #[derive(serde::Serialize)]
 pub struct Program {
     pub functions: Vec<FunctionDefinition>,
-    #[serde(skip)]
-    pub span: parsel::Span,
 }
 
 impl Program {
@@ -63,7 +61,6 @@ pub struct LetBind {
 impl From<crate::parser::ProgramParseTree> for Program {
     fn from(value: crate::parser::ProgramParseTree) -> Self {
         Self {
-            span: value.functions.span(),
             functions: value.functions.into_iter().map(|x| x.into()).collect(),
         }
     }
@@ -158,6 +155,19 @@ impl From<crate::parser::Expression> for Expression {
                     (*x.right_side.clone()).into(),
                 ],
                 span: value.span(),
+            },
+            crate::parser::Expression::FunctionApplication {
+                ref func_name,
+                ref args,
+            } => Expression::FuncApplication {
+                span: value.span(),
+                func_name: Identifier(func_name.to_string()),
+                args: args
+                    .clone()
+                    .into_inner()
+                    .into_iter()
+                    .map(|x| (*x).into())
+                    .collect(),
             },
             crate::parser::Expression::ExprWhere {
                 bindings,

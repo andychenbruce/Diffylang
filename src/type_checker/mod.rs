@@ -1,5 +1,3 @@
-use parsel::Display;
-
 use crate::ast;
 
 #[derive(Debug)]
@@ -21,6 +19,11 @@ pub enum TypeError {
     BadArithmetic {
         left: SimpleType,
         right: SimpleType,
+        span: parsel::Span,
+    },
+    WrongNumArgs {
+        expected: usize,
+        got: usize,
         span: parsel::Span,
     },
 }
@@ -57,6 +60,17 @@ impl ToString for TypeError {
                     location.line, location.column, left, right
                 )
             }
+            TypeError::WrongNumArgs {
+                expected,
+                got,
+                span,
+            } => {
+                let location = span.start();
+                format!(
+                    "line {} col {}: wrong number of arguments for function, expected {:?} but got {:?}",
+                    location.line, location.column, expected, got
+                )
+            }
         }
     }
 }
@@ -66,10 +80,13 @@ type Res<A> = Result<A, TypeError>;
 #[derive(Clone, Debug)]
 pub enum Type {
     Expr(SimpleType),
-    Function {
-        from: Vec<SimpleType>,
-        to: SimpleType,
-    },
+    Function(FunctionType),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FunctionType {
+    from: Vec<SimpleType>,
+    to: SimpleType,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -107,10 +124,25 @@ impl TypeEnv {
                 if &first.0 == ident {
                     match first.1 {
                         Type::Expr(e) => Some(e),
-                        Type::Function { from: _, to: _ } => rest.find_var_type(ident),
+                        Type::Function(_) => rest.find_var_type(ident),
                     }
                 } else {
                     rest.find_var_type(ident)
+                }
+            }
+        }
+    }
+    fn find_function_type(&self, ident: &ast::Identifier) -> Option<FunctionType> {
+        match self {
+            TypeEnv::End => None,
+            TypeEnv::Rest { first, rest } => {
+                if &first.0 == ident {
+                    match &first.1 {
+                        Type::Expr(_) => rest.find_function_type(ident),
+                        Type::Function(func_type) => Some(func_type.clone()),
+                    }
+                } else {
+                    rest.find_function_type(ident)
                 }
             }
         }
@@ -160,14 +192,14 @@ fn type_check_func(env: TypeEnv, func: &ast::FunctionDefinition) -> Res<TypeEnv>
     Ok(TypeEnv::Rest {
         first: (
             func.name.clone(),
-            Type::Function {
+            Type::Function(FunctionType {
                 from: func
                     .arguments
                     .iter()
                     .map(|x| (&x.1).try_into().unwrap())
                     .collect(),
                 to: (&func.to_type).try_into().unwrap(),
-            },
+            }),
         ),
         rest: Box::new(env),
     })
@@ -199,6 +231,19 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 assert!(args.len() == 2);
                 validate_comparison(env, &args[0], &args[1], *span).unwrap();
                 return Ok(SimpleType::Bool);
+            }
+
+            let function_type = env.find_function_type(func_name).unwrap();
+            if args.len() != function_type.from.len() {
+                return Err(TypeError::WrongNumArgs {
+                    expected: function_type.from.len(),
+                    got: args.len(),
+                    span: *span,
+                });
+            }
+
+            for (expr, expected) in args.into_iter().zip(function_type.from.into_iter()) {
+                assert!(find_expr_type(env.clone(), expr)? == expected);
             }
 
             todo!()
