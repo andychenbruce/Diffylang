@@ -1,8 +1,8 @@
-// mod json_generator;
 mod ast;
-mod interpreter;
 mod parser;
 mod type_checker;
+mod interpreter;
+mod interpreter_soft;
 
 fn main() {
     let program_parse_tree: parser::ProgramParseTree =
@@ -21,8 +21,8 @@ fn main() {
     println!("{}", serde_json::to_string_pretty(&program_ast).unwrap());
 
     // Calling softgt using the module path
-    let result1 = interpreter::softgt(3.0, 2.0); // Should be close to 1
-    let result2 = interpreter::softgt(1.0, 2.0); // Should be close to 0
+    let result1 = interpreter_soft::softgt(3.0, 2.0); // Should be close to 1
+    let result2 = interpreter_soft::softgt(1.0, 2.0); // Should be close to 0
     println!("softgt(3.0, 2.0) = {}", result1);
     println!("softgt(1.0, 2.0) = {}", result2);
 }
