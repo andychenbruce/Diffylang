@@ -29,9 +29,9 @@ impl SoftEnv {
             SoftEnv::End => unreachable!(),
             SoftEnv::Rest { first, rest } => {
                 if first.0 == *var_name {
-                    return first.1;
+                    first.1
                 } else {
-                    return rest.lookup_var(var_name);
+                    rest.lookup_var(var_name)
                 }
             }
         }
@@ -44,7 +44,7 @@ pub fn soft_apply_function(
     arguments: Vec<SoftValue>,
 ) -> SoftValue {
     let _type_env: crate::type_checker::TypeEnv =
-        crate::type_checker::type_check_program(&program).unwrap();
+        crate::type_checker::type_check_program(program).unwrap();
 
     let func = program.find_func(func_name);
 
@@ -59,7 +59,7 @@ pub fn soft_apply_function(
             rest: Box::new(acc),
         });
 
-    return soft_eval(env_with_args, &func.body);
+    soft_eval(env_with_args, &func.body)
 }
 
 fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
@@ -88,7 +88,7 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
                 rest: Box::new(acc),
             });
 
-            return soft_eval(new_env, inner);
+            soft_eval(new_env, inner)
         }
     }
 }
@@ -99,8 +99,8 @@ fn eval_soft_addition(env: SoftEnv, left: &ast::Expression, right: &ast::Express
 
     match (left_val, right_val) {
         (SoftValue::Int(a), SoftValue::Int(b)) => SoftValue::Int(a + b),
-        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Float(a + (b as f64)),
-        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Float((a as f64) + b),
+        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Float(a + b),
+        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Float(a + b),
         (SoftValue::Float(a), SoftValue::Float(b)) => SoftValue::Float(a + b),
         _ => unreachable!(),
     }
@@ -116,8 +116,8 @@ fn eval_soft_subtraction(
 
     match (left_val, right_val) {
         (SoftValue::Int(a), SoftValue::Int(b)) => SoftValue::Int(a - b),
-        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Float(a - (b as f64)),
-        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Float((a as f64) - b),
+        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Float(a - b),
+        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Float(a - b),
         (SoftValue::Float(a), SoftValue::Float(b)) => SoftValue::Float(a - b),
         _ => unreachable!(),
     }
@@ -133,9 +133,9 @@ fn eval_soft_greater_than(
 
     match (left_val, right_val) {
         (SoftValue::Float(a), SoftValue::Float(b)) => SoftValue::Bool(softgt(a, b)),
-        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Bool(softgt(a as f64, b)),
-        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Bool(softgt(a, b as f64)),
-        (SoftValue::Int(a), SoftValue::Int(b)) => SoftValue::Bool(softgt(a, b as f64)),
+        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Bool(softgt(a, b)),
+        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Bool(softgt(a, b)),
+        (SoftValue::Int(a), SoftValue::Int(b)) => SoftValue::Bool(softgt(a, b)),
         _ => unreachable!(),
     }
 }

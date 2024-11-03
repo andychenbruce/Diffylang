@@ -24,6 +24,11 @@ fn main() {
         "is_greater_than_2",
         vec![interpreter_soft::SoftValue::Int(3.0)],
     );
+    if let interpreter_soft::SoftValue::Bool(x) = soft_val {
+        assert!(x > 0.5);
+    } else {
+        panic!();
+    }
 
     println!("soft val = {:?}", soft_val);
 

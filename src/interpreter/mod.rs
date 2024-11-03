@@ -22,9 +22,9 @@ impl Env {
             Env::End => unreachable!(),
             Env::Rest { first, rest } => {
                 if first.0 == *var_name {
-                    return first.1;
+                    first.1
                 } else {
-                    return rest.lookup_var(var_name);
+                    rest.lookup_var(var_name)
                 }
             }
         }
@@ -33,7 +33,7 @@ impl Env {
 
 pub fn apply_function(program: &ast::Program, func_name: &str, arguments: Vec<Value>) -> Value {
     let _type_env: crate::type_checker::TypeEnv =
-        crate::type_checker::type_check_program(&program).unwrap();
+        crate::type_checker::type_check_program(program).unwrap();
 
     let func = program.find_func(func_name);
 
@@ -48,7 +48,7 @@ pub fn apply_function(program: &ast::Program, func_name: &str, arguments: Vec<Va
             rest: Box::new(acc),
         });
 
-    return eval(env_with_args, &func.body);
+    eval(env_with_args, &func.body)
 }
 
 fn eval(env: Env, expr: &ast::Expression) -> Value {
@@ -77,7 +77,7 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
                 rest: Box::new(acc),
             });
 
-            return eval(new_env, inner);
+            eval(new_env, inner)
         }
     }
 }

@@ -1,3 +1,5 @@
+use parsel::Display;
+
 use crate::ast;
 
 #[derive(Debug)]
@@ -28,34 +30,38 @@ pub enum TypeError {
     },
 }
 
-impl ToString for TypeError {
-    fn to_string(&self) -> String {
+impl Display for TypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypeError::UnknownType(typename) => format!("unknown type {}", typename.0),
+            TypeError::UnknownType(typename) => write!(f, "unknown type {}", typename.0),
             TypeError::FuncTypeMismatch {
                 body_type_expected,
                 body_type_found,
-            } => format!(
+            } => write!(
+                f,
                 "function type mismatch, expected {:?}, found {:?}",
                 body_type_expected, body_type_found
             ),
             TypeError::UnknownVariable { span, ident } => {
                 let location = span.start();
-                format!(
+                write!(
+                    f,
                     "Unknown variable on line {} col {}: {}",
                     location.line, location.column, ident.0
                 )
             }
             TypeError::BadComparison { span, left, right } => {
                 let location = span.start();
-                format!(
+                write!(
+                    f,
                     "line {} col {}: could not compare types {:?} and {:?}",
                     location.line, location.column, left, right
                 )
             }
             TypeError::BadArithmetic { left, right, span } => {
                 let location = span.start();
-                format!(
+                write!(
+                    f,
                     "line {} col {}: could not apply arithmetic on types {:?} and {:?}",
                     location.line, location.column, left, right
                 )
@@ -66,7 +72,7 @@ impl ToString for TypeError {
                 span,
             } => {
                 let location = span.start();
-                format!(
+                write!(f,
                     "line {} col {}: wrong number of arguments for function, expected {:?} but got {:?}",
                     location.line, location.column, expected, got
                 )
@@ -208,12 +214,10 @@ fn type_check_func(env: TypeEnv, func: &ast::FunctionDefinition) -> Res<TypeEnv>
 fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
     match expr {
         ast::Expression::Variable { ident, span } => {
-            Ok(env
-                .find_var_type(&ident)
-                .ok_or(TypeError::UnknownVariable {
-                    span: span.clone(),
-                    ident: ident.clone(),
-                })?)
+            Ok(env.find_var_type(ident).ok_or(TypeError::UnknownVariable {
+                span: *span,
+                ident: ident.clone(),
+            })?)
         }
         ast::Expression::Integer(_) => Ok(SimpleType::Int),
         ast::Expression::Str(_) => Ok(SimpleType::String),
@@ -242,7 +246,7 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 });
             }
 
-            for (expr, expected) in args.into_iter().zip(function_type.from.into_iter()) {
+            for (expr, expected) in args.iter().zip(function_type.from.into_iter()) {
                 assert!(find_expr_type(env.clone(), expr)? == expected);
             }
 
