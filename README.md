@@ -1,4 +1,6 @@
-# Approximating Imperative Programs as Neural Networks for Automated
+# WangAnLang
+
+## A language for approximating imperative programs as a neural nets
 
 ## Project Structure
 
