@@ -13,7 +13,7 @@ fn main() {
         Err(err) => panic!("bruh at {:?}: {:?}", err.span().start(), err),
     };
 
-    let program_ast = program_parse_tree.into();
+    let program_ast = ast::make_program(program_parse_tree);
 
     let val = interpreter::run_function(&program_ast, "test", vec![interpreter::Value::Int(3)]);
     assert!(val == interpreter::Value::Bool(true));

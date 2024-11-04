@@ -219,9 +219,9 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 ident: ident.clone(),
             })?)
         }
-        ast::Expression::Integer(_) => Ok(SimpleType::Int),
-        ast::Expression::Str(_) => Ok(SimpleType::String),
-        ast::Expression::Float(_) => Ok(SimpleType::Float),
+        ast::Expression::Integer(_, _) => Ok(SimpleType::Int),
+        ast::Expression::Str(_, _) => Ok(SimpleType::String),
+        ast::Expression::Float(_, _) => Ok(SimpleType::Float),
         ast::Expression::FuncApplication {
             func_name,
             args,

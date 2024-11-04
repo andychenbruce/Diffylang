@@ -88,9 +88,9 @@ fn soft_apply_function(env: SoftEnv, func_name: &str, arguments: Vec<SoftValue>)
 fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
     match expr {
         ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
-        ast::Expression::Integer(x) => SoftValue::Int(*x as f64),
-        ast::Expression::Str(_) => todo!(),
-        ast::Expression::Float(x) => SoftValue::Float(*x),
+        ast::Expression::Integer(x, _) => SoftValue::Int(*x as f64),
+        ast::Expression::Str(_, _) => todo!(),
+        ast::Expression::Float(x, _) => SoftValue::Float(*x),
         ast::Expression::FuncApplication {
             func_name,
             args,

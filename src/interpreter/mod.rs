@@ -77,9 +77,9 @@ fn apply_function(env: Env, func_name: &str, arguments: Vec<Value>) -> Value {
 fn eval(env: Env, expr: &ast::Expression) -> Value {
     match expr {
         ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
-        ast::Expression::Integer(x) => Value::Int(*x),
-        ast::Expression::Str(_) => todo!(),
-        ast::Expression::Float(x) => Value::Float(*x),
+        ast::Expression::Integer(x, _) => Value::Int(*x),
+        ast::Expression::Str(_, _) => todo!(),
+        ast::Expression::Float(x, _) => Value::Float(*x),
         ast::Expression::FuncApplication {
             func_name,
             args,
