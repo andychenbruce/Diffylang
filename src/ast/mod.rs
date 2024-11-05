@@ -9,6 +9,7 @@ pub struct TypeName(pub String);
 #[derive(serde::Serialize)]
 pub struct Program {
     pub functions: Vec<FunctionDefinition>,
+    pub num_ids: usize,
 }
 
 impl Program {
@@ -35,7 +36,7 @@ pub struct FunctionDefinition {
 }
 
 #[derive(serde::Serialize, Copy, Clone)]
-pub struct LitId(usize);
+pub struct LitId(pub usize);
 
 #[derive(serde::Serialize)]
 pub enum Expression {
@@ -70,12 +71,14 @@ pub fn make_program(parse_tree: crate::parser::ProgramParseTree) -> Program {
         next_lit_id: LitId(0),
     };
 
+    let functions = parse_tree
+        .functions
+        .into_iter()
+        .map(|x| make_function_definition(&mut state, x))
+        .collect();
     Program {
-        functions: parse_tree
-            .functions
-            .into_iter()
-            .map(|x| make_function_definition(&mut state, x))
-            .collect(),
+        functions,
+        num_ids: state.next_lit_id.0,
     }
 }
 
