@@ -1,5 +1,7 @@
 use crate::ast;
 
+const SIGMOID_VARIANCE: f64 = 1.0;
+
 #[derive(Clone, Debug)]
 pub struct SoftValue {
     pub value: ValueType,
@@ -278,20 +280,23 @@ fn eval_soft_multiplication(
     }
 }
 
+pub fn sigmoid(u: f64) -> f64 {
+    1.0 / (1.0 + (-1.0 * u / SIGMOID_VARIANCE).exp())
+}
+
+pub fn sigmoid_gradient(u: f64) -> f64 {
+    sigmoid(u) * (1.0 - sigmoid(u))
+}
+
 pub fn softgt(x: f64, c: f64, x_grad: Gradient, c_grad: Gradient) -> SoftValue {
-    let exp_neg = (-1.0 * (x - c)).exp();
-    let value = 1.0 / (1.0 + exp_neg);
+    let value = sigmoid(x - c);
 
     SoftValue {
         gradient: Gradient {
-            values: x_grad
+            values: (x_grad - c_grad)
                 .values
                 .iter()
-                .zip(c_grad.values.iter())
-                .map(|(a, b)| {
-                    let exp_neg = (a - b) * -1.0;
-                    exp_neg / ((1.0 + exp_neg).powi(2))
-                })
+                .map(|x| x * sigmoid_gradient(x - c))
                 .collect(),
         },
         value: ValueType::Bool(value),
