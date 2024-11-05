@@ -296,7 +296,7 @@ pub fn softgt(x: f64, c: f64, x_grad: Gradient, c_grad: Gradient) -> SoftValue {
             values: (x_grad - c_grad)
                 .values
                 .iter()
-                .map(|x| x * sigmoid_gradient(x - c))
+                .map(|g| g * sigmoid_gradient(x - c))
                 .collect(),
         },
         value: ValueType::Bool(value),
