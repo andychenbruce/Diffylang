@@ -20,17 +20,23 @@ fn main() {
 
     println!("val = {:?}", val);
 
-    let soft_val = interpreter_soft::soft_run_function(
-        &program_ast,
-        "test",
-        vec![interpreter_soft::ValueType::Int(3.0)],
-    );
-
-    if let interpreter_soft::ValueType::Bool(x) = soft_val.value {
-        assert!(x > 0.5);
-    } else {
-        panic!();
+    for i in -5..5 {
+        let soft_val = interpreter_soft::soft_run_function(
+            &program_ast,
+            "test",
+            vec![interpreter_soft::ValueType::Int(i as f64)],
+        );
+        println!("i = {}, soft val = {:?}", i, soft_val);
+        if let interpreter_soft::ValueType::Bool(x) = soft_val.value {
+            if i > 2 {
+                assert!(x > 0.5);
+            } else if i < 2 {
+                assert!(x < 0.5);
+            } else {
+                assert!((x - 0.5).abs() < 0.01);
+            }
+        } else {
+            panic!();
+        }
     }
-
-    println!("soft val = {:?}", soft_val);
 }
