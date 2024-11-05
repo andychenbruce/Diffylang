@@ -28,6 +28,7 @@ pub enum TypeError {
         got: usize,
         span: parsel::Span,
     },
+    TestCaseNotBool(SimpleType),
 }
 
 impl Display for TypeError {
@@ -76,6 +77,9 @@ impl Display for TypeError {
                     "line {} col {}: wrong number of arguments for function, expected {:?} but got {:?}",
                     location.line, location.column, expected, got
                 )
+            }
+            TypeError::TestCaseNotBool(real_type) => {
+                write!(f, "test case has type {:?} not bool", real_type)
             }
         }
     }
@@ -169,12 +173,21 @@ impl TryFrom<&ast::TypeName> for SimpleType {
 }
 
 pub fn type_check_program(program: &ast::Program) -> Res<TypeEnv> {
-    Ok(program
+    let env = program
         .functions
         .iter()
         .fold(TypeEnv::empty(), |acc, function| {
             type_check_func(acc, function).unwrap()
-        }))
+        });
+
+    for test_case in program.test_cases.iter() {
+        let test_case_type = find_expr_type(env.clone(), test_case)?;
+        if test_case_type != SimpleType::Bool {
+            return Err(TypeError::TestCaseNotBool(test_case_type));
+        }
+    }
+
+    Ok(env)
 }
 
 fn type_check_func(env: TypeEnv, func: &ast::FunctionDefinition) -> Res<TypeEnv> {
@@ -222,6 +235,7 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
         ast::Expression::Integer(_, _) => Ok(SimpleType::Int),
         ast::Expression::Str(_, _) => Ok(SimpleType::String),
         ast::Expression::Float(_, _) => Ok(SimpleType::Float),
+        ast::Expression::Bool(_, _) => Ok(SimpleType::Bool),
         ast::Expression::FuncApplication {
             func_name,
             args,
@@ -231,7 +245,7 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 assert!(args.len() == 2);
                 return find_arithmtic_type(env, &args[0], &args[1], *span);
             }
-            if ["__gt", "__lt"].contains(&func_name.0.as_str()) {
+            if ["__gt", "__lt", "__eq"].contains(&func_name.0.as_str()) {
                 assert!(args.len() == 2);
                 validate_comparison(env, &args[0], &args[1], *span).unwrap();
                 return Ok(SimpleType::Bool);

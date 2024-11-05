@@ -9,6 +9,7 @@ pub struct TypeName(pub String);
 #[derive(serde::Serialize)]
 pub struct Program {
     pub functions: Vec<FunctionDefinition>,
+    pub test_cases: Vec<Expression>,
     pub num_ids: usize,
 }
 
@@ -36,7 +37,7 @@ pub struct FunctionDefinition {
 }
 
 #[derive(serde::Serialize, Copy, Clone)]
-pub struct LitId(pub usize);
+pub struct LitId(pub Option<usize>);
 
 #[derive(serde::Serialize)]
 pub enum Expression {
@@ -48,6 +49,7 @@ pub enum Expression {
     Integer(i64, LitId),
     Float(f64, LitId),
     Str(String, LitId),
+    Bool(bool, LitId),
     FuncApplication {
         func_name: Identifier,
         args: Vec<Expression>,
@@ -68,23 +70,43 @@ pub struct LetBind {
 
 pub fn make_program(parse_tree: crate::parser::ProgramParseTree) -> Program {
     let mut state = AstConversionState {
-        next_lit_id: LitId(0),
+        next_lit_id: LitId(Some(0)),
     };
 
     let functions = parse_tree
-        .functions
-        .into_iter()
-        .map(|x| make_function_definition(&mut state, x))
+        .declarations
+        .iter()
+        .filter_map(|x| match x {
+            crate::parser::Declaration::FunctionDef(f) => {
+                Some(make_function_definition(&mut state, f))
+            }
+            crate::parser::Declaration::TestCaseDef(_) => None,
+        })
+        .collect();
+
+    let test_cases = parse_tree
+        .declarations
+        .iter()
+        .filter_map(|x| match x {
+            crate::parser::Declaration::TestCaseDef(t) => Some(make_expression(
+                &mut AstConversionState {
+                    next_lit_id: LitId(None),
+                },
+                t.inner.clone().into_inner(),
+            )),
+            crate::parser::Declaration::FunctionDef(_) => None,
+        })
         .collect();
     Program {
         functions,
-        num_ids: state.next_lit_id.0,
+        test_cases,
+        num_ids: state.next_lit_id.0.unwrap(),
     }
 }
 
 fn make_function_definition(
     state: &mut AstConversionState,
-    value: crate::parser::FunctionDefinition,
+    value: &crate::parser::FunctionDefinition,
 ) -> FunctionDefinition {
     FunctionDefinition {
         name: Identifier(value.inner.name.to_string()),
@@ -115,17 +137,22 @@ fn make_expression(state: &mut AstConversionState, value: crate::parser::Express
         },
         crate::parser::Expression::IntegerLit(x) => {
             let output = Expression::Integer(x.into_inner(), state.next_lit_id);
-            state.next_lit_id.0 += 1;
+            state.next_lit_id.0.as_mut().map(|x| *x += 1);
             output
         }
         crate::parser::Expression::StringLit(x) => {
             let output = Expression::Str(x.into_inner(), state.next_lit_id);
-            state.next_lit_id.0 += 1;
+            state.next_lit_id.0.as_mut().map(|x| *x += 1);
             output
         }
         crate::parser::Expression::FloatLit(x) => {
             let output = Expression::Float(*x.into_inner(), state.next_lit_id);
-            state.next_lit_id.0 += 1;
+            state.next_lit_id.0.as_mut().map(|x| *x += 1);
+            output
+        }
+        crate::parser::Expression::BoolLit(x) => {
+            let output = Expression::Bool(x.into_inner(), state.next_lit_id);
+            state.next_lit_id.0.as_mut().map(|x| *x += 1);
             output
         }
         crate::parser::Expression::Addition(ref x) => Expression::FuncApplication {

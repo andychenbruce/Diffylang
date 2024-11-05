@@ -51,6 +51,25 @@ pub fn run_function(program: &ast::Program, func_name: &str, arguments: Vec<Valu
     )
 }
 
+pub fn eval_test_cases(program: &ast::Program) -> Vec<Value> {
+    let _type_env: crate::type_checker::TypeEnv =
+        crate::type_checker::type_check_program(program).unwrap();
+
+    program
+        .test_cases
+        .iter()
+        .map(|test_case| {
+            eval(
+                Env {
+                    program,
+                    vars: EnvVars::End,
+                },
+                test_case,
+            )
+        })
+        .collect()
+}
+
 fn apply_function(env: Env, func_name: &str, arguments: Vec<Value>) -> Value {
     let func = env.program.find_func(func_name);
 
@@ -80,6 +99,7 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
         ast::Expression::Integer(x, _) => Value::Int(*x),
         ast::Expression::Str(_, _) => todo!(),
         ast::Expression::Float(x, _) => Value::Float(*x),
+        ast::Expression::Bool(x, _) => Value::Bool(*x),
         ast::Expression::FuncApplication {
             func_name,
             args,

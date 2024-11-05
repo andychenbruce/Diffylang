@@ -2,7 +2,18 @@ use parsel::{syn::Token, Parse, ToTokens};
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct ProgramParseTree {
-    pub functions: parsel::ast::Punctuated<FunctionDefinition, Token![;]>,
+    pub declarations: parsel::ast::Punctuated<Declaration, Token![;]>,
+}
+
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub enum Declaration {
+    FunctionDef(FunctionDefinition),
+    TestCaseDef(TestCaseDefinition),
+}
+
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub struct TestCaseDefinition {
+    pub inner: parsel::ast::Brace<Expression>,
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]
@@ -43,6 +54,7 @@ pub enum Expression {
     IntegerLit(parsel::ast::LitInt),
     StringLit(parsel::ast::LitStr),
     FloatLit(parsel::ast::LitFloat),
+    BoolLit(parsel::ast::LitBool),
     Addition(parsel::ast::Paren<BinaryOp<Token![+]>>),
     Subtraction(parsel::ast::Paren<BinaryOp<Token![-]>>),
     Multiplication(parsel::ast::Paren<BinaryOp<Token![*]>>),

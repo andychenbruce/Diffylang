@@ -16,27 +16,21 @@ fn main() {
     let program_ast = ast::make_program(program_parse_tree);
 
     let val = interpreter::run_function(&program_ast, "test", vec![interpreter::Value::Int(3)]);
-    assert!(val == interpreter::Value::Bool(true));
-
     println!("val = {:?}", val);
+    let soft_val = interpreter_soft::soft_run_function(
+        &program_ast,
+        "test",
+        vec![interpreter_soft::ValueType::Int(3.0)],
+    );
 
-    for i in -5..5 {
-        let soft_val = interpreter_soft::soft_run_function(
-            &program_ast,
-            "test",
-            vec![interpreter_soft::ValueType::Int(i as f64)],
-        );
-        println!("i = {}, soft val = {:?}", i, soft_val);
-        if let interpreter_soft::ValueType::Bool(x) = soft_val.value {
-            if i > 2 {
-                assert!(x > 0.5);
-            } else if i < 2 {
-                assert!(x < 0.5);
-            } else {
-                assert!((x - 0.5).abs() < 0.01);
-            }
-        } else {
-            panic!();
-        }
-    }
+    println!("soft val = {:?}", soft_val);
+
+    println!(
+        "test cases = {:?}",
+        interpreter::eval_test_cases(&program_ast)
+    );
+    println!(
+        "hard test cases = {:?}",
+        interpreter_soft::soft_eval_test_cases(&program_ast)
+    );
 }

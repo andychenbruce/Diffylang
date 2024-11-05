@@ -120,6 +120,25 @@ pub fn soft_run_function(
     )
 }
 
+pub fn soft_eval_test_cases(program: &ast::Program) -> Vec<SoftValue> {
+    let _type_env: crate::type_checker::TypeEnv =
+        crate::type_checker::type_check_program(program).unwrap();
+
+    program
+        .test_cases
+        .iter()
+        .map(|test_case| {
+            soft_eval(
+                SoftEnv {
+                    program,
+                    vars: SoftEnvVars::End,
+                },
+                test_case,
+            )
+        })
+        .collect()
+}
+
 fn soft_apply_function(env: SoftEnv, func_name: &str, arguments: Vec<SoftValue>) -> SoftValue {
     let func = env.program.find_func(func_name);
 
@@ -148,13 +167,14 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
         ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
         ast::Expression::Integer(x, id) => SoftValue {
             value: ValueType::Int(*x as f64),
-            gradient: make_oneshot(env.program.num_ids, id.0),
+            gradient: make_oneshot(env.program.num_ids, *id),
         },
         ast::Expression::Str(_, _) => todo!(),
         ast::Expression::Float(x, id) => SoftValue {
             value: ValueType::Float(*x),
-            gradient: make_oneshot(env.program.num_ids, id.0),
+            gradient: make_oneshot(env.program.num_ids, *id),
         },
+        ast::Expression::Bool(_, _) => todo!(),
         ast::Expression::FuncApplication {
             func_name,
             args,
@@ -303,9 +323,11 @@ pub fn softgt(x: f64, c: f64, x_grad: Gradient, c_grad: Gradient) -> SoftValue {
     }
 }
 
-fn make_oneshot(size: usize, pos: usize) -> Gradient {
+fn make_oneshot(size: usize, pos: crate::ast::LitId) -> Gradient {
     let mut output = vec![0.0; size];
-    output[pos] = 1.0;
+    if let Some(pos) = pos.0 {
+        output[pos] = 1.0;
+    }
 
     Gradient { values: output }
 }

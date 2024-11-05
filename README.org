@@ -42,6 +42,20 @@ A language for approximating imperative programs as a neural nets.
   - [ ] soft
   - [ ] gradient
 
+** boolean logic
+- [ ] and
+  - [ ] hard
+  - [ ] soft
+  - [ ] gradient
+- [ ] or
+  - [ ] hard
+  - [ ] soft
+  - [ ] gradient
+- [ ] not
+  - [ ] hard
+  - [ ] soft
+  - [ ] gradient
+
 ** lists
 - [ ] getting
   - [ ] hard
