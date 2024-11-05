@@ -1,10 +1,17 @@
 use crate::ast;
 
-#[derive(Copy, Clone, Debug)]
-pub enum SoftValue {
-    Int(f64),
-    Float(f64),
-    Bool(f64),
+#[derive(Clone, Debug)]
+pub struct SoftValue {
+    pub value: f64,
+    pub gradient: f64,
+    pub value_type: ValueType,
+}
+
+#[derive(Clone, Debug)]
+pub enum ValueType {
+    Int,
+    Float,
+    Bool,
 }
 
 #[derive(Clone, Debug)]
@@ -35,7 +42,7 @@ impl SoftEnvVars {
             SoftEnvVars::End => unreachable!(),
             SoftEnvVars::Rest { first, rest } => {
                 if first.0 == *var_name {
-                    first.1
+                    first.1.clone()
                 } else {
                     rest.lookup_var(var_name)
                 }
@@ -88,9 +95,17 @@ fn soft_apply_function(env: SoftEnv, func_name: &str, arguments: Vec<SoftValue>)
 fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
     match expr {
         ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
-        ast::Expression::Integer(x, _) => SoftValue::Int(*x as f64),
+        ast::Expression::Integer(x, _) => SoftValue {
+            value: *x as f64,
+            gradient: 0.0, // Initial gradient
+            value_type: ValueType::Int,
+        },
         ast::Expression::Str(_, _) => todo!(),
-        ast::Expression::Float(x, _) => SoftValue::Float(*x),
+        ast::Expression::Float(x, _) => SoftValue {
+            value: *x,
+            gradient: 0.0, // Initial gradient
+            value_type: ValueType::Float,
+        },
         ast::Expression::FuncApplication {
             func_name,
             args,
@@ -139,49 +154,67 @@ fn eval_soft_addition(env: SoftEnv, left: &ast::Expression, right: &ast::Express
     let left_val = soft_eval(env.clone(), left);
     let right_val = soft_eval(env.clone(), right);
 
-    match (left_val, right_val) {
-        (SoftValue::Int(a), SoftValue::Int(b)) => SoftValue::Int(a + b),
-        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Float(a + b),
-        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Float(a + b),
-        (SoftValue::Float(a), SoftValue::Float(b)) => SoftValue::Float(a + b),
-        _ => unreachable!(),
+    // Handle the addition based on the value types
+    match (left_val.value_type, right_val.value_type) {
+        (ValueType::Int, ValueType::Int) | (ValueType::Float, ValueType::Float) | (ValueType::Int, ValueType::Float) | (ValueType::Float, ValueType::Int) => {
+            let result_value = left_val.value + right_val.value;
+            let result_gradient = left_val.gradient + right_val.gradient; // Adjust based on your gradient computation logic
+            SoftValue {
+                value: result_value,
+                gradient: result_gradient,
+                value_type: ValueType::Float, // Promote to Float if necessary
+            }
+        },
+        _ => panic!("Unsupported types for addition"),
     }
 }
 
-fn eval_soft_subtraction(
-    env: SoftEnv,
-    left: &ast::Expression,
-    right: &ast::Expression,
-) -> SoftValue {
+fn eval_soft_subtraction(env: SoftEnv, left: &ast::Expression, right: &ast::Expression) -> SoftValue {
     let left_val = soft_eval(env.clone(), left);
     let right_val = soft_eval(env.clone(), right);
 
-    match (left_val, right_val) {
-        (SoftValue::Int(a), SoftValue::Int(b)) => SoftValue::Int(a - b),
-        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Float(a - b),
-        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Float(a - b),
-        (SoftValue::Float(a), SoftValue::Float(b)) => SoftValue::Float(a - b),
-        _ => unreachable!(),
+    match (left_val.value_type, right_val.value_type) {
+        (ValueType::Int, ValueType::Int) | (ValueType::Float, ValueType::Float) | (ValueType::Int, ValueType::Float) | (ValueType::Float, ValueType::Int) => {
+            let result_value = left_val.value - right_val.value;
+            let result_gradient = left_val.gradient - right_val.gradient; // Adjust based on your gradient computation logic
+            SoftValue {
+                value: result_value,
+                gradient: result_gradient,
+                value_type: ValueType::Float,
+            }
+        },
+        _ => panic!("Unsupported types for subtraction"),
     }
 }
 
-fn eval_soft_greater_than(
-    env: SoftEnv,
-    left: &ast::Expression,
-    right: &ast::Expression,
-) -> SoftValue {
+fn eval_soft_greater_than(env: SoftEnv, left: &ast::Expression, right: &ast::Expression) -> SoftValue {
     let left_val = soft_eval(env.clone(), left);
     let right_val = soft_eval(env.clone(), right);
 
-    match (left_val, right_val) {
-        (SoftValue::Float(a), SoftValue::Float(b)) => SoftValue::Bool(softgt(a, b)),
-        (SoftValue::Int(a), SoftValue::Float(b)) => SoftValue::Bool(softgt(a, b)),
-        (SoftValue::Float(a), SoftValue::Int(b)) => SoftValue::Bool(softgt(a, b)),
-        (SoftValue::Int(a), SoftValue::Int(b)) => SoftValue::Bool(softgt(a, b)),
-        _ => unreachable!(),
+    let (result_value, result_gradient) = softgt(left_val.value, right_val.value);
+    SoftValue {
+        value: result_value,
+        gradient: result_gradient,
+        value_type: ValueType::Bool,
     }
 }
 
-pub fn softgt(x: f64, c: f64) -> f64 {
-    1.0 / (1.0 + (-1.0 * (x - c)).exp())
+fn eval_soft_multiplication(env: SoftEnv, left: &ast::Expression, right: &ast::Expression) -> SoftValue {
+    let left_val = soft_eval(env.clone(), left);
+    let right_val = soft_eval(env.clone(), right);
+
+    let result_value = left_val.value * right_val.value;
+    let result_gradient = left_val.value * right_val.gradient + right_val.value * left_val.gradient; // Product rule (Correct me if I'm wrong)
+    SoftValue {
+        value: result_value,
+        gradient: result_gradient,
+        value_type: ValueType::Float,
+    }
+}
+
+pub fn softgt(x: f64, c: f64) -> (f64, f64) {
+    let exp_neg = (-1.0 * (x - c)).exp();
+    let value = 1.0 / (1.0 + exp_neg);
+    let gradient = exp_neg / ((1.0 + exp_neg).powi(2));
+    (value, gradient)
 }

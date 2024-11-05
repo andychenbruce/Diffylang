@@ -23,13 +23,13 @@ fn main() {
     let soft_val = interpreter_soft::soft_run_function(
         &program_ast,
         "test",
-        vec![interpreter_soft::SoftValue::Int(3.0)],
+        vec![interpreter_soft::SoftValue {
+            value: 3.0,
+            gradient: 0.0,
+            value_type: interpreter_soft::ValueType::Int,
+        }],
     );
-    if let interpreter_soft::SoftValue::Bool(x) = soft_val {
-        assert!(x > 0.5);
-    } else {
-        panic!();
-    }
+    assert!(soft_val.value > 0.5);
 
     println!("soft val = {:?}", soft_val);
 
@@ -38,6 +38,6 @@ fn main() {
     // Calling softgt using the module path
     let result1 = interpreter_soft::softgt(3.0, 2.0); // Should be close to 1
     let result2 = interpreter_soft::softgt(1.0, 2.0); // Should be close to 0
-    println!("softgt(3.0, 2.0) = {}", result1);
-    println!("softgt(1.0, 2.0) = {}", result2);
+    println!("softgt(3.0, 2.0) = {:?}", result1);
+    println!("softgt(1.0, 2.0) = {:?}", result2);
 }
