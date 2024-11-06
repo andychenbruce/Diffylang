@@ -13,4 +13,6 @@
   (is_greater_than_2(x))];
 
 {is_greater_than_2(3)};
-{test(4)}
+{test(4)};
+{!is_greater_than_2(2)};
+{!is_greater_than_2(1)};

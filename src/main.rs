@@ -46,4 +46,6 @@ fn main() {
         "test cases fixed maybe = {:?}",
         interpreter::eval_test_cases(&program_ast)
     );
+
+    // println!("{}", serde_json::to_string_pretty(&program_ast).unwrap());
 }

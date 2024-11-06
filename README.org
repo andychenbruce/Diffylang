@@ -51,10 +51,10 @@ A language for approximating imperative programs as a neural nets.
   - [ ] hard
   - [ ] soft
   - [ ] gradient
-- [ ] not
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+- [X] not
+  - [X] hard
+  - [X] soft
+  - [X] gradient
 
 ** lists
 - [ ] getting

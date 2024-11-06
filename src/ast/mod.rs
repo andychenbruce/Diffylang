@@ -20,6 +20,7 @@ impl Program {
                 return func;
             }
         }
+        eprintln!("coulnd't find func {}", name);
         unreachable!()
     }
 }
@@ -217,6 +218,30 @@ fn make_expression(state: &mut AstConversionState, value: crate::parser::Express
                 make_expression(state, *x.left_side.clone()),
                 make_expression(state, *x.right_side.clone()),
             ],
+            span: value.span(),
+        },
+        crate::parser::Expression::And(ref x) => Expression::FuncApplication {
+            func_name: Identifier("__and".to_owned()),
+            args: vec![
+                make_expression(state, *x.left_side.clone()),
+                make_expression(state, *x.right_side.clone()),
+            ],
+            span: value.span(),
+        },
+        crate::parser::Expression::Or(ref x) => Expression::FuncApplication {
+            func_name: Identifier("__or".to_owned()),
+            args: vec![
+                make_expression(state, *x.left_side.clone()),
+                make_expression(state, *x.right_side.clone()),
+            ],
+            span: value.span(),
+        },
+        crate::parser::Expression::Not {
+            exclamation_mark: _,
+            ref inner,
+        } => Expression::FuncApplication {
+            func_name: Identifier("__not".to_owned()),
+            args: vec![make_expression(state, *inner.clone())],
             span: value.span(),
         },
         crate::parser::Expression::FunctionApplication {

@@ -111,7 +111,10 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
             "__div" => todo!(),
             "__eq" => todo!(),
             "__gt" => eval_greater_than(env, &args[0], &args[1]),
-            "__lt" => todo!(),
+            "__lt" => eval_less_than(env, &args[0], &args[1]),
+            "__and" => todo!(),
+            "__or" => todo!(),
+            "__not" => eval_not(env, &args[0]),
             func_name => apply_function(
                 env.clone(),
                 func_name,
@@ -179,6 +182,28 @@ fn eval_greater_than(env: Env, left: &ast::Expression, right: &ast::Expression) 
         (Value::Float(a), Value::Int(b)) => Value::Bool(a > (b as f64)),
         (Value::Int(a), Value::Float(b)) => Value::Bool((a as f64) > b),
         (Value::Float(a), Value::Float(b)) => Value::Bool(a > b),
+        _ => unreachable!(),
+    }
+}
+
+fn eval_less_than(env: Env, left: &ast::Expression, right: &ast::Expression) -> Value {
+    let left_val = eval(env.clone(), left);
+    let right_val = eval(env.clone(), right);
+
+    match (left_val, right_val) {
+        (Value::Int(a), Value::Int(b)) => Value::Bool(a < b),
+        (Value::Float(a), Value::Int(b)) => Value::Bool(a < (b as f64)),
+        (Value::Int(a), Value::Float(b)) => Value::Bool((a as f64) < b),
+        (Value::Float(a), Value::Float(b)) => Value::Bool(a < b),
+        _ => unreachable!(),
+    }
+}
+
+fn eval_not(env: Env, val: &ast::Expression) -> Value {
+    let val = eval(env.clone(), val);
+
+    match val {
+        Value::Bool(a) => Value::Bool(!a),
         _ => unreachable!(),
     }
 }

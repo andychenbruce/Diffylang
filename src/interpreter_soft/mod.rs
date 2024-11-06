@@ -194,6 +194,9 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
             "__eq" => todo!(),
             "__gt" => eval_soft_greater_than(env, &args[0], &args[1]),
             "__lt" => todo!(),
+            "__and" => todo!(),
+            "__or" => todo!(),
+            "__not" => eval_soft_not(env, &args[0]),
             func_name => soft_apply_function(
                 env.clone(),
                 func_name,
@@ -378,5 +381,21 @@ fn apply_gradient_expr(expr: &mut ast::Expression, grad: &Gradient) {
             apply_gradient_expr(inner, grad);
         }
         _ => {}
+    }
+}
+
+fn eval_soft_not(env: SoftEnv, val: &ast::Expression) -> SoftValue {
+    let val = soft_eval(env.clone(), val);
+
+    let new_val = match val.value {
+        ValueType::Bool(a) => ValueType::Bool(1.0 - a),
+        _ => unreachable!(),
+    };
+
+    let new_grad = val.gradient * -1.0;
+
+    SoftValue {
+        value: new_val,
+        gradient: new_grad,
     }
 }

@@ -62,6 +62,13 @@ pub enum Expression {
     Equality(parsel::ast::Paren<BinaryOp<Token![==]>>),
     GreaterThan(parsel::ast::Paren<BinaryOp<Token![>]>>),
     LessThan(parsel::ast::Paren<BinaryOp<Token![<]>>),
+    And(parsel::ast::Paren<BinaryOp<Token![&&]>>),
+    Or(parsel::ast::Paren<BinaryOp<Token![||]>>),
+    Not {
+        exclamation_mark: Token![!],
+        #[parsel(recursive)]
+        inner: Box<Expression>,
+    },
     ExprWhere {
         bindings:
             parsel::ast::Paren<parsel::ast::Punctuated<parsel::ast::Paren<LetBind>, Token![,]>>,

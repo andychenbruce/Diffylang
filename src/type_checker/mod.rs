@@ -23,6 +23,11 @@ pub enum TypeError {
         right: SimpleType,
         span: parsel::Span,
     },
+    BadBoolean {
+        left: SimpleType,
+        right: SimpleType,
+        span: parsel::Span,
+    },
     WrongNumArgs {
         expected: usize,
         got: usize,
@@ -64,6 +69,14 @@ impl Display for TypeError {
                 write!(
                     f,
                     "line {} col {}: could not apply arithmetic on types {:?} and {:?}",
+                    location.line, location.column, left, right
+                )
+            }
+            TypeError::BadBoolean { left, right, span } => {
+                let location = span.start();
+                write!(
+                    f,
+                    "line {} col {}: could not apply boolean op on types {:?} and {:?}",
                     location.line, location.column, left, right
                 )
             }
@@ -248,6 +261,29 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             if ["__gt", "__lt", "__eq"].contains(&func_name.0.as_str()) {
                 assert!(args.len() == 2);
                 validate_comparison(env, &args[0], &args[1], *span).unwrap();
+                return Ok(SimpleType::Bool);
+            }
+            if ["__and", "__or"].contains(&func_name.0.as_str()) {
+                assert!(args.len() == 2);
+
+                return match (
+                    find_expr_type(env.clone(), &args[0])?,
+                    find_expr_type(env.clone(), &args[1])?,
+                ) {
+                    (SimpleType::Int, SimpleType::Int) => Ok(SimpleType::Bool),
+                    (left, right) => Err(TypeError::BadBoolean {
+                        left,
+                        right,
+                        span: *span,
+                    }),
+                };
+            }
+            if ["__not"].contains(&func_name.0.as_str()) {
+                assert!(args.len() == 1);
+                assert!(matches!(
+                    find_expr_type(env.clone(), &args[0])?,
+                    SimpleType::Bool
+                ));
                 return Ok(SimpleType::Bool);
             }
 
