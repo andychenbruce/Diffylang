@@ -137,22 +137,30 @@ fn make_expression(state: &mut AstConversionState, value: crate::parser::Express
         },
         crate::parser::Expression::IntegerLit(x) => {
             let output = Expression::Integer(x.into_inner(), state.next_lit_id);
-            state.next_lit_id.0.as_mut().map(|x| *x += 1);
+            if let Some(x) = state.next_lit_id.0.as_mut() {
+                *x += 1
+            };
             output
         }
         crate::parser::Expression::StringLit(x) => {
             let output = Expression::Str(x.into_inner(), state.next_lit_id);
-            state.next_lit_id.0.as_mut().map(|x| *x += 1);
+            if let Some(x) = state.next_lit_id.0.as_mut() {
+                *x += 1
+            };
             output
         }
         crate::parser::Expression::FloatLit(x) => {
             let output = Expression::Float(*x.into_inner(), state.next_lit_id);
-            state.next_lit_id.0.as_mut().map(|x| *x += 1);
+            if let Some(x) = state.next_lit_id.0.as_mut() {
+                *x += 1
+            };
             output
         }
         crate::parser::Expression::BoolLit(x) => {
             let output = Expression::Bool(x.into_inner(), state.next_lit_id);
-            state.next_lit_id.0.as_mut().map(|x| *x += 1);
+            if let Some(x) = state.next_lit_id.0.as_mut() {
+                *x += 1
+            };
             output
         }
         crate::parser::Expression::Addition(ref x) => Expression::FuncApplication {

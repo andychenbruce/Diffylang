@@ -8,8 +8,8 @@ A language for approximating imperative programs as a neural nets.
 ** DONE evaluation
 ** DONE soft evaluation
 ** DONE calculate gradients
-** TODO gradient descent
-** TODO loss function
+** DONE gradient descent
+** TODO loss functions
 ** TODO switch from cpu to gpu tensors
 
 ** arithmetic

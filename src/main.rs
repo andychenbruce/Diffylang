@@ -13,7 +13,7 @@ fn main() {
         Err(err) => panic!("bruh at {:?}: {:?}", err.span().start(), err),
     };
 
-    let program_ast = ast::make_program(program_parse_tree);
+    let mut program_ast = ast::make_program(program_parse_tree);
 
     let val = interpreter::run_function(&program_ast, "test", vec![interpreter::Value::Int(3)]);
     println!("val = {:?}", val);
@@ -29,8 +29,21 @@ fn main() {
         "test cases = {:?}",
         interpreter::eval_test_cases(&program_ast)
     );
+
+    for _ in 0..5 {
+        let soft_cases = interpreter_soft::soft_eval_test_cases(&program_ast);
+
+        println!("soft test cases = {:?}", soft_cases);
+
+        let average_grad = soft_cases.into_iter().fold(
+            interpreter_soft::make_oneshot(program_ast.num_ids, crate::ast::LitId(None)),
+            |acc, new| acc + new.1,
+        );
+
+        interpreter_soft::apply_gradient_program(&mut program_ast, &average_grad);
+    }
     println!(
-        "hard test cases = {:?}",
-        interpreter_soft::soft_eval_test_cases(&program_ast)
+        "test cases fixed maybe = {:?}",
+        interpreter::eval_test_cases(&program_ast)
     );
 }

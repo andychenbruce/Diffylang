@@ -120,7 +120,7 @@ pub fn soft_run_function(
     )
 }
 
-pub fn soft_eval_test_cases(program: &ast::Program) -> Vec<SoftValue> {
+pub fn soft_eval_test_cases(program: &ast::Program) -> Vec<(f64, Gradient)> {
     let _type_env: crate::type_checker::TypeEnv =
         crate::type_checker::type_check_program(program).unwrap();
 
@@ -135,6 +135,13 @@ pub fn soft_eval_test_cases(program: &ast::Program) -> Vec<SoftValue> {
                 },
                 test_case,
             )
+        })
+        .map(|x| {
+            if let ValueType::Bool(v) = x.value {
+                (v, x.gradient)
+            } else {
+                panic!()
+            }
         })
         .collect()
 }
@@ -182,7 +189,7 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
         } => match func_name.0.as_str() {
             "__add" => eval_soft_addition(env, &args[0], &args[1]),
             "__sub" => eval_soft_subtraction(env, &args[0], &args[1]),
-            "__mul" => todo!(),
+            "__mul" => eval_soft_multiplication(env, &args[0], &args[1]),
             "__div" => todo!(),
             "__eq" => todo!(),
             "__gt" => eval_soft_greater_than(env, &args[0], &args[1]),
@@ -323,7 +330,7 @@ pub fn softgt(x: f64, c: f64, x_grad: Gradient, c_grad: Gradient) -> SoftValue {
     }
 }
 
-fn make_oneshot(size: usize, pos: crate::ast::LitId) -> Gradient {
+pub fn make_oneshot(size: usize, pos: crate::ast::LitId) -> Gradient {
     let mut output = vec![0.0; size];
     if let Some(pos) = pos.0 {
         output[pos] = 1.0;
@@ -337,5 +344,39 @@ fn get_number_vals(val: &SoftValue) -> f64 {
         ValueType::Int(x) => x,
         ValueType::Float(x) => x,
         _ => unreachable!(),
+    }
+}
+
+pub fn apply_gradient_program(program: &mut ast::Program, grad: &Gradient) {
+    for function in program.functions.iter_mut() {
+        apply_gradient_expr(&mut function.body, grad);
+    }
+}
+
+fn apply_gradient_expr(expr: &mut ast::Expression, grad: &Gradient) {
+    match expr {
+        ast::Expression::Integer(val, id) => {
+            *expr = ast::Expression::Float((*val as f64) + grad.values[id.0.unwrap()], *id)
+        }
+        ast::Expression::Float(val, id) => *val += grad.values[id.0.unwrap()],
+        ast::Expression::Str(_, _) => todo!(),
+        ast::Expression::Bool(_, _) => todo!(),
+        ast::Expression::FuncApplication {
+            func_name: _,
+            args,
+            span: _,
+        } => {
+            for arg in args {
+                apply_gradient_expr(arg, grad);
+            }
+        }
+        ast::Expression::ExprWhere { bindings, inner } => {
+            for binding in bindings {
+                apply_gradient_expr(&mut binding.value, grad);
+            }
+
+            apply_gradient_expr(inner, grad);
+        }
+        _ => {}
     }
 }
