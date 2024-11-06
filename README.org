@@ -71,10 +71,10 @@ A language for approximating imperative programs as a neural nets.
   - [ ] gradient
 
 ** control flow
-- [ ] if else
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+- [X] if else
+  - [X] hard
+  - [X] soft
+  - [X] gradient
 - [ ] for loops
   - only fixed length loops
   - [ ] hard

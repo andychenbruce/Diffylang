@@ -187,16 +187,28 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
             args,
             span: _,
         } => match func_name.0.as_str() {
-            "__add" => eval_soft_addition(env, &args[0], &args[1]),
-            "__sub" => eval_soft_subtraction(env, &args[0], &args[1]),
-            "__mul" => eval_soft_multiplication(env, &args[0], &args[1]),
+            "__add" => soft_addition(
+                soft_eval(env.clone(), &args[0]),
+                soft_eval(env.clone(), &args[1]),
+            ),
+            "__sub" => soft_subtraction(
+                soft_eval(env.clone(), &args[0]),
+                soft_eval(env.clone(), &args[1]),
+            ),
+            "__mul" => soft_multiplication(
+                soft_eval(env.clone(), &args[0]),
+                soft_eval(env.clone(), &args[1]),
+            ),
             "__div" => todo!(),
             "__eq" => todo!(),
-            "__gt" => eval_soft_greater_than(env, &args[0], &args[1]),
+            "__gt" => soft_greater_than(
+                soft_eval(env.clone(), &args[0]),
+                soft_eval(env.clone(), &args[1]),
+            ),
             "__lt" => todo!(),
             "__and" => todo!(),
             "__or" => todo!(),
-            "__not" => eval_soft_not(env, &args[0]),
+            "__not" => soft_not(soft_eval(env.clone(), &args[0])),
             func_name => soft_apply_function(
                 env.clone(),
                 func_name,
@@ -226,13 +238,40 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
                 inner,
             )
         }
+        ast::Expression::IfThenElse {
+            boolean,
+            true_expr,
+            false_expr,
+        } => {
+            let boolean_eval = soft_eval(env.clone(), boolean);
+            if let ValueType::Bool(boolean_val) = boolean_eval.value {
+                let true_eval = soft_eval(env.clone(), true_expr);
+                let false_eval = soft_eval(env.clone(), false_expr);
+
+                soft_addition(
+                    soft_multiplication(
+                        SoftValue {
+                            gradient: boolean_eval.gradient.clone(),
+                            value: ValueType::Float(boolean_val),
+                        },
+                        true_eval,
+                    ),
+                    soft_multiplication(
+                        SoftValue {
+                            gradient: boolean_eval.gradient * -1.0,
+                            value: ValueType::Float(1.0 - boolean_val),
+                        },
+                        false_eval,
+                    ),
+                )
+            } else {
+                panic!()
+            }
+        }
     }
 }
 
-fn eval_soft_addition(env: SoftEnv, left: &ast::Expression, right: &ast::Expression) -> SoftValue {
-    let left = soft_eval(env.clone(), left);
-    let right = soft_eval(env.clone(), right);
-
+fn soft_addition(left: SoftValue, right: SoftValue) -> SoftValue {
     let left_val = get_number_vals(&left);
     let right_val = get_number_vals(&right);
 
@@ -249,14 +288,7 @@ fn eval_soft_addition(env: SoftEnv, left: &ast::Expression, right: &ast::Express
     }
 }
 
-fn eval_soft_subtraction(
-    env: SoftEnv,
-    left: &ast::Expression,
-    right: &ast::Expression,
-) -> SoftValue {
-    let left = soft_eval(env.clone(), left);
-    let right = soft_eval(env.clone(), right);
-
+fn soft_subtraction(left: SoftValue, right: SoftValue) -> SoftValue {
     let left_val = get_number_vals(&left);
     let right_val = get_number_vals(&right);
 
@@ -273,28 +305,14 @@ fn eval_soft_subtraction(
     }
 }
 
-fn eval_soft_greater_than(
-    env: SoftEnv,
-    left: &ast::Expression,
-    right: &ast::Expression,
-) -> SoftValue {
-    let left = soft_eval(env.clone(), left);
-    let right = soft_eval(env.clone(), right);
-
+fn soft_greater_than(left: SoftValue, right: SoftValue) -> SoftValue {
     let left_val = get_number_vals(&left);
     let right_val = get_number_vals(&right);
 
     softgt(left_val, right_val, left.gradient, right.gradient)
 }
 
-fn eval_soft_multiplication(
-    env: SoftEnv,
-    left: &ast::Expression,
-    right: &ast::Expression,
-) -> SoftValue {
-    let left = soft_eval(env.clone(), left);
-    let right = soft_eval(env.clone(), right);
-
+fn soft_multiplication(left: SoftValue, right: SoftValue) -> SoftValue {
     let left_val = get_number_vals(&left);
     let right_val = get_number_vals(&right);
 
@@ -384,9 +402,7 @@ fn apply_gradient_expr(expr: &mut ast::Expression, grad: &Gradient) {
     }
 }
 
-fn eval_soft_not(env: SoftEnv, val: &ast::Expression) -> SoftValue {
-    let val = soft_eval(env.clone(), val);
-
+fn soft_not(val: SoftValue) -> SoftValue {
     let new_val = match val.value {
         ValueType::Bool(a) => ValueType::Bool(1.0 - a),
         _ => unreachable!(),

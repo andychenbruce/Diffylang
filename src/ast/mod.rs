@@ -61,6 +61,11 @@ pub enum Expression {
         bindings: Vec<LetBind>,
         inner: Box<Expression>,
     },
+    IfThenElse {
+        boolean: Box<Expression>,
+        true_expr: Box<Expression>,
+        false_expr: Box<Expression>,
+    },
 }
 
 #[derive(serde::Serialize)]
@@ -278,5 +283,17 @@ fn make_expression(state: &mut AstConversionState, value: crate::parser::Express
                 inner: Box::new(make_expression(state, *inner)),
             }
         }
+        crate::parser::Expression::IfThenElse {
+            if_token: _,
+            boolean,
+            then_token: _,
+            true_expr,
+            else_token: _,
+            false_expr,
+        } => Expression::IfThenElse {
+            boolean: Box::new(make_expression(state, *boolean)),
+            true_expr: Box::new(make_expression(state, *true_expr)),
+            false_expr: Box::new(make_expression(state, *false_expr)),
+        },
     }
 }

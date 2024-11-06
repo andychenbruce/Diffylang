@@ -1,5 +1,9 @@
 use parsel::{syn::Token, Parse, ToTokens};
 
+mod kw {
+    parsel::custom_keyword!(then);
+}
+
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct ProgramParseTree {
     pub declarations: parsel::ast::Punctuated<Declaration, Token![;]>,
@@ -75,6 +79,17 @@ pub enum Expression {
         where_token: Token![in],
         #[parsel(recursive)]
         inner: Box<Expression>,
+    },
+    IfThenElse {
+        if_token: Token![if],
+        #[parsel(recursive)]
+        boolean: Box<Expression>,
+        then_token: kw::then,
+        #[parsel(recursive)]
+        true_expr: Box<Expression>,
+        else_token: Token![else],
+        #[parsel(recursive)]
+        false_expr: Box<Expression>,
     },
 }
 

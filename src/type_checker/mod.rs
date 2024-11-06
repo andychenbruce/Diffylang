@@ -317,6 +317,23 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
 
             find_expr_type(env_with_bindings, inner)
         }
+        ast::Expression::IfThenElse {
+            boolean,
+            true_expr,
+            false_expr,
+        } => {
+            assert!(matches!(
+                find_expr_type(env.clone(), boolean)?,
+                SimpleType::Bool
+            ));
+
+            let true_type = find_expr_type(env.clone(), true_expr)?;
+            let false_type = find_expr_type(env.clone(), false_expr)?;
+
+            assert!(true_type == false_type);
+
+            Ok(true_type)
+        }
     }
 }
 

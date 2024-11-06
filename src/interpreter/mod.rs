@@ -144,6 +144,21 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
                 inner,
             )
         }
+        ast::Expression::IfThenElse {
+            boolean,
+            true_expr,
+            false_expr,
+        } => {
+            if let Value::Bool(boolean) = eval(env.clone(), boolean) {
+                if boolean {
+                    eval(env.clone(), true_expr)
+                } else {
+                    eval(env.clone(), false_expr)
+                }
+            } else {
+                panic!()
+            }
+        }
     }
 }
 
