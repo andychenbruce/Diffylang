@@ -340,11 +340,10 @@ fn soft_division(left: SoftValue, right: SoftValue) -> SoftValue {
     }
 
     let result_value = match (left.value, right.value) {
-        (ValueType::Int(_), ValueType::Int(_)) => ValueType::Int(left_val / right_val),
+        (ValueType::Int(_), ValueType::Int(_)) => ValueType::Float(left_val / right_val),
         _ => ValueType::Float(left_val / right_val),
     };
 
-    // Gradient computation remains the same
     let numerator_gradient = left.gradient.clone() * right_val - right.gradient.clone() * left_val;
     let denominator = right_val * right_val;
 
@@ -355,6 +354,7 @@ fn soft_division(left: SoftValue, right: SoftValue) -> SoftValue {
         gradient: result_gradient,
     }
 }
+
 
 
 pub fn sigmoid(u: f64) -> f64 {

@@ -211,20 +211,19 @@ fn eval_division(env: Env, left: &ast::Expression, right: &ast::Expression) -> V
             if b == 0 {
                 panic!("Division by zero");
             }
-            // For integer division, you might decide whether to perform integer division or convert to float
-            Value::Int(a / b)
+            Value::Float(a as f64 / b as f64) // Return Float instead of Int
         }
         (Value::Float(a), Value::Int(b)) => {
             if b == 0 {
                 panic!("Division by zero");
             }
-            Value::Float(a / (b as f64))
+            Value::Float(a / b as f64)
         }
         (Value::Int(a), Value::Float(b)) => {
             if b == 0.0 {
                 panic!("Division by zero");
             }
-            Value::Float((a as f64) / b)
+            Value::Float(a as f64 / b)
         }
         (Value::Float(a), Value::Float(b)) => {
             if b == 0.0 {
@@ -235,6 +234,7 @@ fn eval_division(env: Env, left: &ast::Expression, right: &ast::Expression) -> V
         _ => panic!("Type error in division"),
     }
 }
+
 
 fn eval_less_than(env: Env, left: &ast::Expression, right: &ast::Expression) -> Value {
     let left_val = eval(env.clone(), left);

@@ -256,7 +256,7 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
         } => {
             if ["__add", "__sub", "__div"].contains(&func_name.0.as_str()) {
                 assert!(args.len() == 2);
-                return find_arithmtic_type(env, &args[0], &args[1], *span);
+                return find_arithmtic_type(env, &args[0], &args[1], *span, func_name.0.as_str());
             }
             if ["__gt", "__lt", "__eq"].contains(&func_name.0.as_str()) {
                 assert!(args.len() == 2);
@@ -360,12 +360,19 @@ fn find_arithmtic_type(
     left: &ast::Expression,
     right: &ast::Expression,
     span: parsel::Span,
+    op: &str, 
 ) -> Res<SimpleType> {
     match (
         find_expr_type(env.clone(), left)?,
         find_expr_type(env.clone(), right)?,
     ) {
-        (SimpleType::Int, SimpleType::Int) => Ok(SimpleType::Int),
+        (SimpleType::Int, SimpleType::Int) => {
+            if op == "__div" {
+                Ok(SimpleType::Float) 
+            } else {
+                Ok(SimpleType::Int)
+            }
+        }
         (SimpleType::Int, SimpleType::Float) => Ok(SimpleType::Float),
         (SimpleType::Float, SimpleType::Int) => Ok(SimpleType::Float),
         (SimpleType::Float, SimpleType::Float) => Ok(SimpleType::Float),
