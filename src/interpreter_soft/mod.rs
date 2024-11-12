@@ -199,7 +199,10 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
                 soft_eval(env.clone(), &args[0]),
                 soft_eval(env.clone(), &args[1]),
             ),
-            "__div" => todo!(),
+            "__div" => soft_division(
+                soft_eval(env.clone(), &args[0]),
+                soft_eval(env.clone(), &args[1]),
+            ),
             "__eq" => todo!(),
             "__gt" => soft_greater_than(
                 soft_eval(env.clone(), &args[0]),
@@ -327,6 +330,32 @@ fn soft_multiplication(left: SoftValue, right: SoftValue) -> SoftValue {
         gradient: result_gradient,
     }
 }
+
+fn soft_division(left: SoftValue, right: SoftValue) -> SoftValue {
+    let left_val = get_number_vals(&left);
+    let right_val = get_number_vals(&right);
+
+    if right_val == 0.0 {
+        panic!("Division by zero in soft interpreter");
+    }
+
+    let result_value = match (left.value, right.value) {
+        (ValueType::Int(_), ValueType::Int(_)) => ValueType::Int(left_val / right_val),
+        _ => ValueType::Float(left_val / right_val),
+    };
+
+    // Gradient computation remains the same
+    let numerator_gradient = left.gradient.clone() * right_val - right.gradient.clone() * left_val;
+    let denominator = right_val * right_val;
+
+    let result_gradient = numerator_gradient * (1.0 / denominator);
+
+    SoftValue {
+        value: result_value,
+        gradient: result_gradient,
+    }
+}
+
 
 pub fn sigmoid(u: f64) -> f64 {
     1.0 / (1.0 + (-1.0 * u / SIGMOID_VARIANCE).exp())

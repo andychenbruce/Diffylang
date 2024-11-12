@@ -108,7 +108,7 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
             "__add" => eval_addition(env, &args[0], &args[1]),
             "__sub" => eval_subtraction(env, &args[0], &args[1]),
             "__mul" => todo!(),
-            "__div" => todo!(),
+            "__div" => eval_division(env, &args[0], &args[1]),
             "__eq" => todo!(),
             "__gt" => eval_greater_than(env, &args[0], &args[1]),
             "__lt" => eval_less_than(env, &args[0], &args[1]),
@@ -188,6 +188,7 @@ fn eval_subtraction(env: Env, left: &ast::Expression, right: &ast::Expression) -
     }
 }
 
+
 fn eval_greater_than(env: Env, left: &ast::Expression, right: &ast::Expression) -> Value {
     let left_val = eval(env.clone(), left);
     let right_val = eval(env.clone(), right);
@@ -198,6 +199,40 @@ fn eval_greater_than(env: Env, left: &ast::Expression, right: &ast::Expression) 
         (Value::Int(a), Value::Float(b)) => Value::Bool((a as f64) > b),
         (Value::Float(a), Value::Float(b)) => Value::Bool(a > b),
         _ => unreachable!(),
+    }
+}
+
+fn eval_division(env: Env, left: &ast::Expression, right: &ast::Expression) -> Value {
+    let left_val = eval(env.clone(), left);
+    let right_val = eval(env, right);
+
+    match (left_val, right_val) {
+        (Value::Int(a), Value::Int(b)) => {
+            if b == 0 {
+                panic!("Division by zero");
+            }
+            // For integer division, you might decide whether to perform integer division or convert to float
+            Value::Int(a / b)
+        }
+        (Value::Float(a), Value::Int(b)) => {
+            if b == 0 {
+                panic!("Division by zero");
+            }
+            Value::Float(a / (b as f64))
+        }
+        (Value::Int(a), Value::Float(b)) => {
+            if b == 0.0 {
+                panic!("Division by zero");
+            }
+            Value::Float((a as f64) / b)
+        }
+        (Value::Float(a), Value::Float(b)) => {
+            if b == 0.0 {
+                panic!("Division by zero");
+            }
+            Value::Float(a / b)
+        }
+        _ => panic!("Type error in division"),
     }
 }
 
