@@ -108,7 +108,7 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
             "__add" => eval_addition(env, &args[0], &args[1]),
             "__sub" => eval_subtraction(env, &args[0], &args[1]),
             "__mul" => todo!(),
-            "__div" => eval_division(env, &args[0], &args[1]),
+            "__div" => todo!(),
             "__eq" => todo!(),
             "__gt" => eval_greater_than(env, &args[0], &args[1]),
             "__lt" => eval_less_than(env, &args[0], &args[1]),
@@ -201,7 +201,7 @@ fn eval_greater_than(env: Env, left: &ast::Expression, right: &ast::Expression) 
         _ => unreachable!(),
     }
 }
-
+/* 
 fn eval_division(env: Env, left: &ast::Expression, right: &ast::Expression) -> Value {
     let left_val = eval(env.clone(), left);
     let right_val = eval(env, right);
@@ -234,7 +234,7 @@ fn eval_division(env: Env, left: &ast::Expression, right: &ast::Expression) -> V
         _ => panic!("Type error in division"),
     }
 }
-
+*/
 
 fn eval_less_than(env: Env, left: &ast::Expression, right: &ast::Expression) -> Value {
     let left_val = eval(env.clone(), left);

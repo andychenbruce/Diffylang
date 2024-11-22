@@ -57,6 +57,17 @@ impl core::ops::Mul<f64> for Gradient {
     }
 }
 
+impl core::ops::Div<f64> for Gradient {
+    type Output = Gradient;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        Gradient {
+            values: self.values.iter().map(|x| x / rhs).collect(),
+        }
+    }
+}
+
+
 #[derive(Clone, Debug)]
 pub enum ValueType {
     Int(f64),

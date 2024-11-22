@@ -1,17 +1,32 @@
-[bruh_idk
-  ((x : int), (y : int), (z : int)) -> bool
-  (((let a = 2),
-   (let c = 3)) in
-   ((((x + c) - a) + (y + z)) > a))];
+// Function to multiply two integers
+[mul_test_int ((x : int), (y : int)) -> int
+  ((x * y))];
 
-[divide_test ((x : int), (y : int)) -> float
-  ((x / y))]; // Define the divide_test function if not already defined
+// Function to divide two integers (result is float)
+[div_test_int ((x : int), (y : int)) -> float
+  ((x / y))];
 
-[divide_test_case1 () -> bool
-  (divide_test(10, 2) == 5.0)];
+// Function to multiply two floats
+[mul_test_float ((x : float), (y : float)) -> float
+  ((x * y))];
 
-[divide_test_case2 () -> bool
-  (divide_test(5, 0) == 0.0)]; // Handle division by zero appropriately
+// Function to divide two floats
+[div_test_float ((x : float), (y : float)) -> float
+  ((x / y))];
 
-{divide_test_case1()};
-{divide_test_case2()};
+// Test functions that return results directly
+[mul_int_result () -> int
+  (mul_test_int(3, 4))];
+
+[div_int_result () -> float
+  (div_test_int(10, 2))];
+
+[mul_float_result () -> float
+  (mul_test_float(2.5, 4.0))];
+
+[div_float_result () -> float
+  (div_test_float(9.0, 3.0))];
+
+// Test function for division by zero handling
+[div_int_zero_result () -> float
+  (div_test_int(5, 0))]; // Ensure your division function handles division by zero appropriately
