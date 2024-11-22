@@ -211,7 +211,7 @@ fn eval_division(env: Env, left: &ast::Expression, right: &ast::Expression) -> V
             if b == 0 {
                 panic!("Division by zero");
             }
-            Value::Float(a as f64 / b as f64) // Return Float instead of Int
+            Value::Float(a as f64 / b as f64) // Convert to Float
         }
         (Value::Float(a), Value::Int(b)) => {
             if b == 0 {
