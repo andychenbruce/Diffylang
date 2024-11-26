@@ -1,4 +1,3 @@
-
 [bruh_idk
   ((x : int), (y : int), (z : int)) -> bool
   (((let a = 2),
@@ -15,12 +14,22 @@
 [is_less_than_or_equal_to_2 ((x : int)) -> bool
   (!is_greater_than_2(x))];
 
+[hard_eq_test
+  ((x : int), (y : int)) -> bool
+  (__eq(x, y))];
+
+[soft_eq_test
+  ((x : int), (y : int)) -> bool
+  (__eq(x, y))];
+
 {is_greater_than_2(3)};
-
 {test(4)};
-
 {!is_greater_than_2(2)};
-
 {!is_greater_than_2(1)};
-
 {!is_less_than_or_equal_to_2(4)};
+
+{hard_eq_test(5, 5)};   // True
+{hard_eq_test(5, 4)};   // False
+
+{soft_eq_test(5, 5)};   // ~1.0
+{soft_eq_test(5, 4)};   // <1.0

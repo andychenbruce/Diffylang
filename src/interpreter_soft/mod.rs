@@ -200,7 +200,10 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
                 soft_eval(env.clone(), &args[1]),
             ),
             "__div" => todo!(),
-            "__eq" => todo!(),
+            "__eq" => soft_equality(
+                soft_eval(env.clone(), &args[0]),
+                soft_eval(env.clone(), &args[1]),
+            ),
             "__gt" => soft_greater_than(
                 soft_eval(env.clone(), &args[0]),
                 soft_eval(env.clone(), &args[1]),
@@ -301,6 +304,22 @@ fn soft_subtraction(left: SoftValue, right: SoftValue) -> SoftValue {
 
     SoftValue {
         value: new_val,
+        gradient: new_gradient,
+    }
+}
+
+fn soft_equality(left: SoftValue, right: SoftValue) -> SoftValue {
+    let left_val = get_number_vals(&left);
+    let right_val = get_number_vals(&right);
+
+    let diff = (left_val - right_val).abs();
+    let value = (1.0 - sigmoid(diff)).max(0.0);
+    let grad_factor = -sigmoid_gradient(diff);
+
+    let new_gradient = left.gradient * grad_factor + right.gradient * grad_factor;
+
+    SoftValue {
+        value: ValueType::Bool(value),
         gradient: new_gradient,
     }
 }
