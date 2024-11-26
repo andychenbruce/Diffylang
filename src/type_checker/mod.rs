@@ -254,7 +254,7 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             args,
             span,
         } => {
-            if ["__add", "__sub"].contains(&func_name.0.as_str()) {
+            if ["__add", "__sub", "__mul"].contains(&func_name.0.as_str()) {
                 assert!(args.len() == 2);
                 return find_arithmtic_type(env, &args[0], &args[1], *span);
             }
@@ -287,7 +287,9 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 return Ok(SimpleType::Bool);
             }
 
-            let function_type = env.find_function_type(func_name).unwrap();
+            let function_type = env
+                .find_function_type(func_name)
+                .unwrap_or_else(|| panic!("unknown function {}", func_name.0));
             if args.len() != function_type.from.len() {
                 return Err(TypeError::WrongNumArgs {
                     expected: function_type.from.len(),
@@ -333,6 +335,31 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             assert!(true_type == false_type);
 
             Ok(true_type)
+        }
+        ast::Expression::FoldLoop {
+            accumulator,
+            body,
+            range,
+        } => {
+            assert!(matches!(
+                find_expr_type(env.clone(), &range.0)?,
+                SimpleType::Int
+            ));
+            assert!(matches!(
+                find_expr_type(env.clone(), &range.1)?,
+                SimpleType::Int
+            ));
+            let acc_type = find_expr_type(env.clone(), &accumulator.1)?;
+
+            let new_env = env
+                .clone()
+                .add_type(accumulator.0.clone(), Type::Expr(acc_type));
+
+            let body_type = find_expr_type(new_env, body)?;
+
+            assert!(acc_type == body_type);
+
+            Ok(body_type)
         }
     }
 }

@@ -107,7 +107,7 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
         } => match func_name.0.as_str() {
             "__add" => eval_addition(env, &args[0], &args[1]),
             "__sub" => eval_subtraction(env, &args[0], &args[1]),
-            "__mul" => todo!(),
+            "__mul" => eval_multiplication(env, &args[0], &args[1]),
             "__div" => todo!(),
             "__eq" => todo!(),
             "__gt" => eval_greater_than(env, &args[0], &args[1]),
@@ -159,6 +159,33 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
                 panic!()
             }
         }
+        ast::Expression::FoldLoop {
+            range,
+            accumulator,
+            body,
+        } => {
+            let start = match eval(env.clone(), &range.0) {
+                Value::Int(x) => x,
+                _ => unreachable!(),
+            };
+            let end = match eval(env.clone(), &range.1) {
+                Value::Int(x) => x,
+                _ => unreachable!(),
+            };
+
+            (start..end).fold(eval(env.clone(), &accumulator.1), |acc, _| {
+                let new_vars = EnvVars::Rest {
+                    first: (accumulator.0.clone(), acc),
+                    rest: Box::new(env.vars.clone()),
+                };
+                let new_env = Env {
+                    program: env.program,
+                    vars: new_vars,
+                };
+
+                eval(new_env, body)
+            })
+        }
     }
 }
 
@@ -184,6 +211,19 @@ fn eval_subtraction(env: Env, left: &ast::Expression, right: &ast::Expression) -
         (Value::Float(a), Value::Int(b)) => Value::Float(a - (b as f64)),
         (Value::Int(a), Value::Float(b)) => Value::Float((a as f64) - b),
         (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
+        _ => unreachable!(),
+    }
+}
+
+fn eval_multiplication(env: Env, left: &ast::Expression, right: &ast::Expression) -> Value {
+    let left_val = eval(env.clone(), left);
+    let right_val = eval(env.clone(), right);
+
+    match (left_val, right_val) {
+        (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
+        (Value::Float(a), Value::Int(b)) => Value::Float(a * (b as f64)),
+        (Value::Int(a), Value::Float(b)) => Value::Float((a as f64) * b),
+        (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
         _ => unreachable!(),
     }
 }

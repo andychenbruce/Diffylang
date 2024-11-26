@@ -268,6 +268,35 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
                 panic!()
             }
         }
+        ast::Expression::FoldLoop {
+            accumulator,
+            body,
+            range,
+        } => {
+            let start = match soft_eval(env.clone(), &range.0).value {
+                ValueType::Int(x) => x,
+                _ => unreachable!(),
+            }
+            .floor() as usize;
+            let end = match soft_eval(env.clone(), &range.1).value {
+                ValueType::Int(x) => x,
+                _ => unreachable!(),
+            }
+            .floor() as usize;
+
+            (start..end).fold(soft_eval(env.clone(), &accumulator.1), |acc, _| {
+                let new_vars = SoftEnvVars::Rest {
+                    first: (accumulator.0.clone(), acc),
+                    rest: Box::new(env.vars.clone()),
+                };
+                let new_env = SoftEnv {
+                    program: env.program,
+                    vars: new_vars,
+                };
+
+                soft_eval(new_env, body)
+            })
+        }
     }
 }
 

@@ -15,17 +15,18 @@ fn main() {
 
     let mut program_ast = ast::make_program(program_parse_tree);
 
-    let val = interpreter::run_function(&program_ast, "test", vec![interpreter::Value::Int(3)]);
-    println!("val = {:?}", val);
+    let val = interpreter::run_function(&program_ast, "pow2", vec![interpreter::Value::Int(3)]);
+    eprintln!("val = {:?}", val);
+
     let soft_val = interpreter_soft::soft_run_function(
         &program_ast,
-        "test",
+        "pow2",
         vec![interpreter_soft::ValueType::Int(3.0)],
     );
 
-    println!("soft val = {:?}", soft_val);
+    eprintln!("soft val = {:?}", soft_val);
 
-    println!(
+    eprintln!(
         "test cases = {:?}",
         interpreter::eval_test_cases(&program_ast)
     );
@@ -33,7 +34,7 @@ fn main() {
     for _ in 0..5 {
         let soft_cases = interpreter_soft::soft_eval_test_cases(&program_ast);
 
-        println!("soft test cases = {:?}", soft_cases);
+        eprintln!("soft test cases = {:?}", soft_cases);
 
         let average_grad = soft_cases.into_iter().fold(
             interpreter_soft::make_oneshot(program_ast.num_ids, crate::ast::LitId(None)),
@@ -42,10 +43,9 @@ fn main() {
 
         interpreter_soft::apply_gradient_program(&mut program_ast, &average_grad);
     }
-    println!(
+
+    eprintln!(
         "test cases fixed maybe = {:?}",
         interpreter::eval_test_cases(&program_ast)
     );
-
-    // println!("{}", serde_json::to_string_pretty(&program_ast).unwrap());
 }

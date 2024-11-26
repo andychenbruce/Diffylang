@@ -66,6 +66,11 @@ pub enum Expression {
         true_expr: Box<Expression>,
         false_expr: Box<Expression>,
     },
+    FoldLoop {
+        range: (Box<Expression>, Box<Expression>),
+        accumulator: (Identifier, Box<Expression>),
+        body: Box<Expression>,
+    },
 }
 
 #[derive(serde::Serialize)]
@@ -295,5 +300,25 @@ fn make_expression(state: &mut AstConversionState, value: crate::parser::Express
             true_expr: Box::new(make_expression(state, *true_expr)),
             false_expr: Box::new(make_expression(state, *false_expr)),
         },
+        crate::parser::Expression::FoldLoop {
+            fold_token: _,
+            accumulator,
+            body,
+            range,
+        } => {
+            let acc_inner = accumulator.into_inner();
+            let range = range.into_inner();
+            Expression::FoldLoop {
+                accumulator: (
+                    Identifier(acc_inner.name.to_string()),
+                    Box::new(make_expression(state, *acc_inner.initial_expression)),
+                ),
+                body: Box::new(make_expression(state, *body)),
+                range: (
+                    Box::new(make_expression(state, *range.start)),
+                    Box::new(make_expression(state, *range.end)),
+                ),
+            }
+        }
     }
 }
