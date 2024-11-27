@@ -121,9 +121,6 @@ pub fn soft_run_function(
 }
 
 pub fn soft_eval_test_cases(program: &ast::Program) -> Vec<(f64, Gradient)> {
-    let _type_env: crate::type_checker::TypeEnv =
-        crate::type_checker::type_check_program(program).unwrap();
-
     program
         .test_cases
         .iter()

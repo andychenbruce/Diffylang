@@ -190,7 +190,8 @@ pub fn type_check_program(program: &ast::Program) -> Res<TypeEnv> {
         .functions
         .iter()
         .fold(TypeEnv::empty(), |acc, function| {
-            type_check_func(acc, function).unwrap()
+            type_check_func(acc, function)
+                .unwrap_or_else(|e| panic!("error in func {}: {}", function.name.0, e))
         });
 
     for test_case in program.test_cases.iter() {
@@ -299,7 +300,9 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             }
 
             for (expr, expected) in args.iter().zip(function_type.from.into_iter()) {
-                assert!(find_expr_type(env.clone(), expr)? == expected);
+                if find_expr_type(env.clone(), expr)? != expected {
+                    panic!("error in function {}", func_name.0)
+                }
             }
 
             Ok(function_type.to)

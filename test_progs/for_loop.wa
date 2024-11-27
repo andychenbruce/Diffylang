@@ -1,0 +1,3 @@
+[pow2 ((x : int)) -> int
+  (fold (0, x) (acc, 1) (acc * 2))
+];

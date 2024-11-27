@@ -52,9 +52,6 @@ pub fn run_function(program: &ast::Program, func_name: &str, arguments: Vec<Valu
 }
 
 pub fn eval_test_cases(program: &ast::Program) -> Vec<Value> {
-    let _type_env: crate::type_checker::TypeEnv =
-        crate::type_checker::type_check_program(program).unwrap();
-
     program
         .test_cases
         .iter()

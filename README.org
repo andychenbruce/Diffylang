@@ -75,11 +75,12 @@ A language for approximating imperative programs as a neural nets.
   - [X] hard
   - [X] soft
   - [X] gradient
-- [ ] for loops
+- [-] for loops
   - only fixed length loops
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+  - [X] hard
+  - [X] soft
+  - [X] gradient
+  - [ ] be able to access index
 - [ ] while loops
   - represent with a markov chain
   - [ ] hard
