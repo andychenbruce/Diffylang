@@ -254,10 +254,10 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             args,
             span,
         } => {
-            if ["__add", "__sub"].contains(&func_name.0.as_str()) {
+            if ["__add", "__sub", "__mul", "__div"].contains(&func_name.0.as_str()) {
                 assert!(args.len() == 2);
                 return find_arithmtic_type(env, &args[0], &args[1], *span, func_name.0.as_str());
-            }
+            }            
             if ["__gt", "__lt", "__eq"].contains(&func_name.0.as_str()) {
                 assert!(args.len() == 2);
                 validate_comparison(env, &args[0], &args[1], *span).unwrap();

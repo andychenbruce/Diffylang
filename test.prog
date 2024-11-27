@@ -1,32 +1,26 @@
-// Function to multiply two integers
-[mul_test_int ((x : int), (y : int)) -> int
-  ((x * y))];
 
-// Function to divide two integers (result is float)
-[div_test_int ((x : int), (y : int)) -> float
-  ((x / y))];
+[bruh_idk
+  ((x : int), (y : int), (z : int)) -> bool
+  (((let a = 2),
+   (let c = 3)) in
+   ((((x + c) - a) + (y + z)) > a))];
 
-// Function to multiply two floats
-[mul_test_float ((x : float), (y : float)) -> float
-  ((x * y))];
+[is_greater_than_2
+  ((x : int)) -> bool
+  (((x *x)> 4))];
 
-// Function to divide two floats
-[div_test_float ((x : float), (y : float)) -> float
-  ((x / y))];
+[test ((x : int)) -> bool
+  (is_greater_than_2(x))];
 
-// Test functions that return results directly
-[mul_int_result () -> int
-  (mul_test_int(3, 4))];
+[is_less_than_or_equal_to_2 ((x : int)) -> bool
+  (!is_greater_than_2(x))];
 
-[div_int_result () -> float
-  (div_test_int(10, 2))];
+{is_greater_than_2(3)};
 
-[mul_float_result () -> float
-  (mul_test_float(2.5, 4.0))];
+{test(4)};
 
-[div_float_result () -> float
-  (div_test_float(9.0, 3.0))];
+{!is_greater_than_2(2)};
 
-// Test function for division by zero handling
-[div_int_zero_result () -> float
-  (div_test_int(5, 0))]; // Ensure your division function handles division by zero appropriately
+{!is_greater_than_2(1)};
+
+{!is_less_than_or_equal_to_2(4)};
