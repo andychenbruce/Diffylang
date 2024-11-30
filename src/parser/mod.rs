@@ -2,6 +2,7 @@ use parsel::{syn::Token, Parse, ToTokens};
 
 mod kw {
     parsel::custom_keyword!(then);
+    parsel::custom_keyword!(fold);
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]
@@ -49,6 +50,13 @@ pub struct VarType {
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub enum Expression {
+    FoldLoop {
+        fold_token: kw::fold,
+        range: parsel::ast::Paren<FoldRange>,
+        accumulator: parsel::ast::Paren<FoldAccumulator>,
+        #[parsel(recursive)]
+        body: Box<Expression>,
+    },
     FunctionApplication {
         func_name: parsel::ast::Ident,
         #[parsel(recursive)]
@@ -91,6 +99,23 @@ pub enum Expression {
         #[parsel(recursive)]
         false_expr: Box<Expression>,
     },
+}
+
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub struct FoldAccumulator {
+    pub name: parsel::ast::Ident,
+    comma: Token![,],
+    #[parsel(recursive)]
+    pub initial_expression: Box<Expression>,
+}
+
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub struct FoldRange {
+    #[parsel(recursive)]
+    pub start: Box<Expression>,
+    comma: Token![,],
+    #[parsel(recursive)]
+    pub end: Box<Expression>,
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]

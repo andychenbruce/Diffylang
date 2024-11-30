@@ -190,7 +190,8 @@ pub fn type_check_program(program: &ast::Program) -> Res<TypeEnv> {
         .functions
         .iter()
         .fold(TypeEnv::empty(), |acc, function| {
-            type_check_func(acc, function).unwrap()
+            type_check_func(acc, function)
+                .unwrap_or_else(|e| panic!("error in func {}: {}", function.name.0, e))
         });
 
     for test_case in program.test_cases.iter() {
@@ -287,7 +288,9 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 return Ok(SimpleType::Bool);
             }
 
-            let function_type = env.find_function_type(func_name).unwrap();
+            let function_type = env
+                .find_function_type(func_name)
+                .unwrap_or_else(|| panic!("unknown function {}", func_name.0));
             if args.len() != function_type.from.len() {
                 return Err(TypeError::WrongNumArgs {
                     expected: function_type.from.len(),
@@ -297,7 +300,9 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             }
 
             for (expr, expected) in args.iter().zip(function_type.from.into_iter()) {
-                assert!(find_expr_type(env.clone(), expr)? == expected);
+                if find_expr_type(env.clone(), expr)? != expected {
+                    panic!("error in function {}", func_name.0)
+                }
             }
 
             Ok(function_type.to)
@@ -333,6 +338,31 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             assert!(true_type == false_type);
 
             Ok(true_type)
+        }
+        ast::Expression::FoldLoop {
+            accumulator,
+            body,
+            range,
+        } => {
+            assert!(matches!(
+                find_expr_type(env.clone(), &range.0)?,
+                SimpleType::Int
+            ));
+            assert!(matches!(
+                find_expr_type(env.clone(), &range.1)?,
+                SimpleType::Int
+            ));
+            let acc_type = find_expr_type(env.clone(), &accumulator.1)?;
+
+            let new_env = env
+                .clone()
+                .add_type(accumulator.0.clone(), Type::Expr(acc_type));
+
+            let body_type = find_expr_type(new_env, body)?;
+
+            assert!(acc_type == body_type);
+
+            Ok(body_type)
         }
     }
 }
