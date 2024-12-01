@@ -61,7 +61,7 @@ impl core::ops::Div<f64> for Gradient {
     type Output = Gradient;
 
     fn div(self, rhs: f64) -> Self::Output {
-        Gradient {
+        return Gradient {
             values: self.values.iter().map(|x| x / rhs).collect(),
         }
     }
@@ -216,7 +216,10 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
                 soft_eval(env.clone(), &args[0]),
                 soft_eval(env.clone(), &args[1]),
             ),
-            "__lt" => todo!(),
+            "__lt" => soft_less_than(
+                soft_eval(env.clone(), &args[0]),
+                soft_eval(env.clone(), &args[1]),
+            ),
             "__and" => todo!(),
             "__or" => todo!(),
             "__not" => soft_not(soft_eval(env.clone(), &args[0])),
@@ -350,6 +353,10 @@ fn soft_greater_than(left: SoftValue, right: SoftValue) -> SoftValue {
     let right_val = get_number_vals(&right);
 
     softgt(left_val, right_val, left.gradient, right.gradient)
+}
+
+fn soft_less_than(left: SoftValue, right: SoftValue) -> SoftValue {
+    soft_greater_than(right, left)
 }
 
 fn soft_multiplication(left: SoftValue, right: SoftValue) -> SoftValue {
