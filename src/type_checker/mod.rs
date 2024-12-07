@@ -112,12 +112,13 @@ pub struct FunctionType {
     to: SimpleType,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SimpleType {
     Int,
     Float,
     Bool,
-    String, // List(u32),
+    String,
+    List(Box<SimpleType>),
             // Dict
 }
 
@@ -145,7 +146,7 @@ impl TypeEnv {
             TypeEnv::End => None,
             TypeEnv::Rest { first, rest } => {
                 if &first.0 == ident {
-                    match first.1 {
+                    match first.1.clone() {
                         Type::Expr(e) => Some(e),
                         Type::Function(_) => rest.find_var_type(ident),
                     }
@@ -342,21 +343,31 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
         ast::Expression::FoldLoop {
             accumulator,
             body,
-            range,
+            fold_iter,
         } => {
-            assert!(matches!(
-                find_expr_type(env.clone(), &range.0)?,
-                SimpleType::Int
-            ));
-            assert!(matches!(
-                find_expr_type(env.clone(), &range.1)?,
-                SimpleType::Int
-            ));
+
+            let iter = match **fold_iter {
+                ast::FoldIter::Range(ref start, ref end) => {
+                    assert!(matches!(
+                        find_expr_type(env.clone(), &start)?,
+                        SimpleType::Int
+                    ));
+                    assert!(matches!(
+                        find_expr_type(env.clone(), &start)?,
+                        SimpleType::Int
+                    ));
+                }
+                ast::FoldIter::ExprList(ref list) => match eval(env.clone(), &list) {
+                    Value::List(l) => l,
+                    _ => unreachable!(),
+                },
+            };
+
             let acc_type = find_expr_type(env.clone(), &accumulator.1)?;
 
             let new_env = env
                 .clone()
-                .add_type(accumulator.0.clone(), Type::Expr(acc_type));
+                .add_type(accumulator.0.clone(), Type::Expr(acc_type.clone()));
 
             let body_type = find_expr_type(new_env, body)?;
 
@@ -364,6 +375,16 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
 
             Ok(body_type)
         }
+        ast::Expression::List { type_name, values } => {
+            let list_type: SimpleType = type_name.try_into()?;
+            for value in values{
+                if find_expr_type(env.clone(), value)? != list_type {
+                    panic!()
+                }
+            }
+            Ok(SimpleType::List(Box::new(list_type)))
+        }
+        
     }
 }
 

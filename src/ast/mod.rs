@@ -51,6 +51,10 @@ pub enum Expression {
     Float(f64, LitId),
     Str(String, LitId),
     Bool(bool, LitId),
+    List {
+        type_name: TypeName,
+        values: Vec<Expression>,
+    },
     FuncApplication {
         func_name: Identifier,
         args: Vec<Expression>,
@@ -67,10 +71,16 @@ pub enum Expression {
         false_expr: Box<Expression>,
     },
     FoldLoop {
-        range: (Box<Expression>, Box<Expression>),
+        fold_iter: Box<FoldIter>,
         accumulator: (Identifier, Box<Expression>),
         body: Box<Expression>,
     },
+}
+
+#[derive(serde::Serialize)]
+pub enum FoldIter {
+    ExprList(Expression),
+    Range(Expression, Expression),
 }
 
 #[derive(serde::Serialize)]
@@ -304,20 +314,40 @@ fn make_expression(state: &mut AstConversionState, value: crate::parser::Express
             fold_token: _,
             accumulator,
             body,
-            range,
+            iter_val,
         } => {
             let acc_inner = accumulator.into_inner();
-            let range = range.into_inner();
+
+            let fold_iter = match iter_val {
+                crate::parser::FoldIter::Range(x) => {
+                    let range = x.into_inner();
+                    FoldIter::Range(
+                        make_expression(state, *range.start),
+                        make_expression(state, *range.end),
+                    )
+                }
+                crate::parser::FoldIter::ListExpr(expr) => {
+                    FoldIter::ExprList(make_expression(state, *expr))
+                }
+            };
             Expression::FoldLoop {
                 accumulator: (
                     Identifier(acc_inner.name.to_string()),
                     Box::new(make_expression(state, *acc_inner.initial_expression)),
                 ),
                 body: Box::new(make_expression(state, *body)),
-                range: (
-                    Box::new(make_expression(state, *range.start)),
-                    Box::new(make_expression(state, *range.end)),
-                ),
+                fold_iter: Box::new(fold_iter),
+            }
+        }
+        crate::parser::Expression::ListLit(list_inner) => {
+            let list_inner = list_inner.into_inner();
+            Expression::List {
+                type_name: TypeName(list_inner.type_name.to_string()),
+                values: list_inner
+                    .values
+                    .into_iter()
+                    .map(|value| make_expression(state, *value))
+                    .collect(),
             }
         }
     }

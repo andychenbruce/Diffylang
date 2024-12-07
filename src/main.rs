@@ -39,11 +39,11 @@ fn main() {
         let val = interpreter::run_function(&program_ast, func_name, func_args.clone());
         eprintln!("val = {:?}", val);
 
-        let soft_args: Vec<interpreter_soft::ValueType> = func_args
+        let soft_args: Vec<interpreter_soft::SoftValue> = func_args
             .iter()
             .map(|arg| match arg {
-                interpreter::Value::Int(x) => interpreter_soft::ValueType::Int(*x as f64),
-                interpreter::Value::Float(x) => interpreter_soft::ValueType::Float(*x),
+                interpreter::Value::Int(x) => program_ast.make_int(*x as f64),
+                interpreter::Value::Float(x) => program_ast.make_float(*x as f64),
                 _ => unreachable!(),
             })
             .collect();

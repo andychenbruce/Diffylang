@@ -1,10 +1,11 @@
 use crate::ast;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Int(i64),
     Float(f64),
     Bool(bool),
+    List(Vec<Value>),
 }
 
 #[derive(Clone)]
@@ -28,7 +29,7 @@ impl EnvVars {
             EnvVars::End => unreachable!(),
             EnvVars::Rest { first, rest } => {
                 if first.0 == *var_name {
-                    first.1
+                    first.1.clone()
                 } else {
                     rest.lookup_var(var_name)
                 }
@@ -157,20 +158,32 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
             }
         }
         ast::Expression::FoldLoop {
-            range,
+            fold_iter,
             accumulator,
             body,
         } => {
-            let start = match eval(env.clone(), &range.0) {
-                Value::Int(x) => x,
-                _ => unreachable!(),
-            };
-            let end = match eval(env.clone(), &range.1) {
-                Value::Int(x) => x,
-                _ => unreachable!(),
-            };
+            let iter = match **fold_iter {
+                ast::FoldIter::Range(ref start, ref end) => {
+                    let start = match eval(env.clone(), &start) {
+                        Value::Int(x) => x,
+                        _ => unreachable!(),
+                    } as usize;
 
-            (start..end).fold(eval(env.clone(), &accumulator.1), |acc, _| {
+                    let end = match eval(env.clone(), &end) {
+                        Value::Int(x) => x,
+                        _ => unreachable!(),
+                    } as usize;
+
+                    (start..end)
+                        .map(|x| Value::Int(x as i64))
+                        .collect()
+                }
+                ast::FoldIter::ExprList(ref list) => match eval(env.clone(), &list) {
+                    Value::List(l) => l,
+                    _ => unreachable!(),
+                },
+            };
+            iter.into_iter().fold(eval(env.clone(), &accumulator.1), |acc, _| {
                 let new_vars = EnvVars::Rest {
                     first: (accumulator.0.clone(), acc),
                     rest: Box::new(env.vars.clone()),
@@ -183,6 +196,10 @@ fn eval(env: Env, expr: &ast::Expression) -> Value {
                 eval(new_env, body)
             })
         }
+        ast::Expression::List { type_name: _, values } => {
+            Value::List(values.into_iter().map(|x| eval(env.clone(), x)).collect())
+        },
+        
     }
 }
 

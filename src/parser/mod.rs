@@ -52,7 +52,8 @@ pub struct VarType {
 pub enum Expression {
     FoldLoop {
         fold_token: kw::fold,
-        range: parsel::ast::Paren<FoldRange>,
+        #[parsel(recursive)]
+        iter_val: FoldIter,
         accumulator: parsel::ast::Paren<FoldAccumulator>,
         #[parsel(recursive)]
         body: Box<Expression>,
@@ -67,6 +68,8 @@ pub enum Expression {
     StringLit(parsel::ast::LitStr),
     FloatLit(parsel::ast::LitFloat),
     BoolLit(parsel::ast::LitBool),
+
+    ListLit(parsel::ast::Brace<ListInner>),
     Addition(parsel::ast::Paren<BinaryOp<Token![+]>>),
     Subtraction(parsel::ast::Paren<BinaryOp<Token![-]>>),
     Multiplication(parsel::ast::Paren<BinaryOp<Token![*]>>),
@@ -110,6 +113,13 @@ pub struct FoldAccumulator {
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]
+pub enum FoldIter {
+    Range(parsel::ast::Paren<FoldRange>),
+    #[parsel(recursive)]
+    ListExpr(Box<Expression>),
+}
+
+#[derive(Clone, Debug, Parse, ToTokens)]
 pub struct FoldRange {
     #[parsel(recursive)]
     pub start: Box<Expression>,
@@ -134,4 +144,12 @@ pub struct LetBind {
     equals_sign: Token![=],
     #[parsel(recursive)]
     pub value: Box<Expression>,
+}
+
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub struct ListInner {
+    pub type_name: parsel::ast::Ident,
+    pub semicolon: Token![;],
+    #[parsel(recursive)]
+    pub values: parsel::ast::Punctuated<Box<Expression>, Token![,]>,
 }

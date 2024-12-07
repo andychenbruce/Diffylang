@@ -3,12 +3,6 @@ use crate::ast;
 const SIGMOID_VARIANCE: f64 = 1.0;
 
 #[derive(Clone, Debug)]
-pub struct SoftValue {
-    pub value: ValueType,
-    pub gradient: Gradient,
-}
-
-#[derive(Clone, Debug)]
 pub struct Gradient {
     values: Vec<f64>,
 }
@@ -58,16 +52,59 @@ impl core::ops::Mul<f64> for Gradient {
 }
 
 #[derive(Clone, Debug)]
-pub enum ValueType {
-    Int(f64),
-    Float(f64),
-    Bool(f64),
+pub enum SoftValue {
+    Int(SoftInt),
+    Float(SoftFloat),
+    Bool(SoftBool),
+    List(SoftList),
+}
+
+#[derive(Clone, Debug)]
+pub struct SoftInt {
+    pub val: f64,
+    pub gradient: Gradient,
+}
+
+#[derive(Clone, Debug)]
+pub struct SoftFloat {
+    pub val: f64,
+    pub gradient: Gradient,
+}
+
+#[derive(Clone, Debug)]
+pub struct SoftBool {
+    pub val: f64,
+    pub gradient: Gradient,
+}
+
+#[derive(Clone, Debug)]
+pub struct SoftList {
+    pub vals: Vec<SoftValue>,
 }
 
 #[derive(Clone)]
 struct SoftEnv<'a> {
     program: &'a ast::Program,
     vars: SoftEnvVars,
+}
+
+impl ast::Program {
+    pub fn make_int(&self, x: f64) -> SoftValue {
+        SoftValue::Int(SoftInt {
+            val: x,
+            gradient: Gradient {
+                values: vec![0.0; self.num_ids],
+            },
+        })
+    }
+    pub fn make_float(&self, x: f64) -> SoftValue {
+        SoftValue::Float(SoftFloat {
+            val: x,
+            gradient: Gradient {
+                values: vec![0.0; self.num_ids],
+            },
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -97,7 +134,7 @@ impl SoftEnvVars {
 pub fn soft_run_function(
     program: &ast::Program,
     func_name: &str,
-    arguments: Vec<ValueType>,
+    arguments: Vec<SoftValue>,
 ) -> SoftValue {
     let _type_env: crate::type_checker::TypeEnv =
         crate::type_checker::type_check_program(program).unwrap();
@@ -108,15 +145,7 @@ pub fn soft_run_function(
             vars: SoftEnvVars::End,
         },
         func_name,
-        arguments
-            .into_iter()
-            .map(|x| SoftValue {
-                value: x,
-                gradient: Gradient {
-                    values: vec![0.0; program.num_ids],
-                },
-            })
-            .collect(),
+        arguments,
     )
 }
 
@@ -134,8 +163,8 @@ pub fn soft_eval_test_cases(program: &ast::Program) -> Vec<(f64, Gradient)> {
             )
         })
         .map(|x| {
-            if let ValueType::Bool(v) = x.value {
-                (v, x.gradient)
+            if let SoftValue::Bool(v) = x {
+                (v.val, v.gradient)
             } else {
                 panic!()
             }
@@ -169,15 +198,15 @@ fn soft_apply_function(env: SoftEnv, func_name: &str, arguments: Vec<SoftValue>)
 fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
     match expr {
         ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
-        ast::Expression::Integer(x, id) => SoftValue {
-            value: ValueType::Int(*x as f64),
+        ast::Expression::Integer(x, id) => SoftValue::Int(SoftInt {
+            val: *x as f64,
             gradient: make_oneshot(env.program.num_ids, *id),
-        },
+        }),
         ast::Expression::Str(_, _) => todo!(),
-        ast::Expression::Float(x, id) => SoftValue {
-            value: ValueType::Float(*x),
+        ast::Expression::Float(x, id) => SoftValue::Float(SoftFloat {
+            val: *x,
             gradient: make_oneshot(env.program.num_ids, *id),
-        },
+        }),
         ast::Expression::Bool(_, _) => todo!(),
         ast::Expression::FuncApplication {
             func_name,
@@ -241,23 +270,23 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
             false_expr,
         } => {
             let boolean_eval = soft_eval(env.clone(), boolean);
-            if let ValueType::Bool(boolean_val) = boolean_eval.value {
+            if let SoftValue::Bool(boolean_val) = boolean_eval {
                 let true_eval = soft_eval(env.clone(), true_expr);
                 let false_eval = soft_eval(env.clone(), false_expr);
 
                 soft_addition(
                     soft_multiplication(
-                        SoftValue {
-                            gradient: boolean_eval.gradient.clone(),
-                            value: ValueType::Float(boolean_val),
-                        },
+                        SoftValue::Float(SoftFloat {
+                            gradient: boolean_val.gradient.clone(),
+                            val: boolean_val.val,
+                        }),
                         true_eval,
                     ),
                     soft_multiplication(
-                        SoftValue {
-                            gradient: boolean_eval.gradient * -1.0,
-                            value: ValueType::Float(1.0 - boolean_val),
-                        },
+                        SoftValue::Float(SoftFloat {
+                            gradient: boolean_val.gradient.clone() * -1.0,
+                            val: 1.0 - boolean_val.val,
+                        }),
                         false_eval,
                     ),
                 )
@@ -268,89 +297,119 @@ fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
         ast::Expression::FoldLoop {
             accumulator,
             body,
-            range,
+            fold_iter,
         } => {
-            let start = match soft_eval(env.clone(), &range.0).value {
-                ValueType::Int(x) => x,
-                _ => unreachable!(),
-            }
-            .floor() as usize;
-            let end = match soft_eval(env.clone(), &range.1).value {
-                ValueType::Int(x) => x,
-                _ => unreachable!(),
-            }
-            .floor() as usize;
+            let iter = match **fold_iter {
+                ast::FoldIter::Range(ref start, ref end) => {
+                    let start = match soft_eval(env.clone(), &start) {
+                        SoftValue::Int(x) => x.val,
+                        _ => unreachable!(),
+                    }
+                    .floor() as usize;
 
-            (start..end).fold(soft_eval(env.clone(), &accumulator.1), |acc, _| {
-                let new_vars = SoftEnvVars::Rest {
-                    first: (accumulator.0.clone(), acc),
-                    rest: Box::new(env.vars.clone()),
-                };
-                let new_env = SoftEnv {
-                    program: env.program,
-                    vars: new_vars,
-                };
+                    let end = match soft_eval(env.clone(), &end) {
+                        SoftValue::Int(x) => x.val,
+                        _ => unreachable!(),
+                    }
+                    .floor() as usize;
 
-                soft_eval(new_env, body)
-            })
+                    (start..end)
+                        .map(|x| env.program.make_int(x as f64))
+                        .collect()
+                }
+                ast::FoldIter::ExprList(ref list) => match soft_eval(env.clone(), &list) {
+                    SoftValue::List(l) => l.vals,
+                    _ => unreachable!(),
+                },
+            };
+
+            iter.into_iter()
+                .fold(soft_eval(env.clone(), &accumulator.1), |acc, _| {
+                    let new_vars = SoftEnvVars::Rest {
+                        first: (accumulator.0.clone(), acc),
+                        rest: Box::new(env.vars.clone()),
+                    };
+                    let new_env = SoftEnv {
+                        program: env.program,
+                        vars: new_vars,
+                    };
+
+                    soft_eval(new_env, body)
+                })
         }
+        ast::Expression::List {
+            type_name: _,
+            values,
+        } => SoftValue::List(SoftList {
+            vals: values
+                .into_iter()
+                .map(|x| soft_eval(env.clone(), x))
+                .collect(),
+        }),
     }
 }
 
 fn soft_addition(left: SoftValue, right: SoftValue) -> SoftValue {
-    let left_val = get_number_vals(&left);
-    let right_val = get_number_vals(&right);
+    let (left_val, left_grad) = get_number_vals(&left);
+    let (right_val, right_grad) = get_number_vals(&right);
 
-    let new_val = match (left.value, right.value) {
-        (ValueType::Int(_), ValueType::Int(_)) => ValueType::Int(left_val + right_val),
-        _ => ValueType::Float(left_val + right_val),
-    };
+    let new_val = left_val + right_val;
+    let new_gradient = left_grad + right_grad;
 
-    let new_gradient = left.gradient + right.gradient;
-
-    SoftValue {
-        value: new_val,
-        gradient: new_gradient,
+    match (left, right) {
+        (SoftValue::Int(_), SoftValue::Int(_)) => SoftValue::Int(SoftInt {
+            val: new_val,
+            gradient: new_gradient,
+        }),
+        _ => SoftValue::Float(SoftFloat {
+            val: new_val,
+            gradient: new_gradient,
+        }),
     }
 }
 
 fn soft_subtraction(left: SoftValue, right: SoftValue) -> SoftValue {
-    let left_val = get_number_vals(&left);
-    let right_val = get_number_vals(&right);
+    let (left_val, left_grad) = get_number_vals(&left);
+    let (right_val, right_grad) = get_number_vals(&right);
 
-    let new_val = match (left.value, right.value) {
-        (ValueType::Int(_), ValueType::Int(_)) => ValueType::Int(left_val - right_val),
-        _ => ValueType::Float(left_val - right_val),
-    };
+    let new_val = left_val + right_val;
+    let new_gradient = left_grad + right_grad;
 
-    let new_gradient = left.gradient - right.gradient;
-
-    SoftValue {
-        value: new_val,
-        gradient: new_gradient,
+    match (left, right) {
+        (SoftValue::Int(_), SoftValue::Int(_)) => SoftValue::Int(SoftInt {
+            val: new_val,
+            gradient: new_gradient,
+        }),
+        _ => SoftValue::Float(SoftFloat {
+            val: new_val,
+            gradient: new_gradient,
+        }),
     }
 }
 
 fn soft_greater_than(left: SoftValue, right: SoftValue) -> SoftValue {
-    let left_val = get_number_vals(&left);
-    let right_val = get_number_vals(&right);
+    let (left_val, left_grad) = get_number_vals(&left);
+    let (right_val, right_grad) = get_number_vals(&right);
 
-    softgt(left_val, right_val, left.gradient, right.gradient)
+    softgt(left_val, right_val, left_grad, right_grad)
 }
 
 fn soft_multiplication(left: SoftValue, right: SoftValue) -> SoftValue {
-    let left_val = get_number_vals(&left);
-    let right_val = get_number_vals(&right);
+    let (left_val, left_grad) = get_number_vals(&left);
+    let (right_val, right_grad) = get_number_vals(&right);
 
-    let result_value = match (left.value, right.value) {
-        (ValueType::Int(_), ValueType::Int(_)) => ValueType::Int(left_val * right_val),
-        _ => ValueType::Float(left_val * right_val),
-    };
-    let result_gradient = left.gradient * right_val + right.gradient * left_val; //product rule
+    let new_val = left_val * right_val;
+    let new_gradient = left_grad * right_val + right_grad * left_val; //product rule
 
-    SoftValue {
-        value: result_value,
-        gradient: result_gradient,
+    match (left, right) {
+        (SoftValue::Int(_), SoftValue::Int(_)) => SoftValue::Int(SoftInt {
+            val: new_val,
+            gradient: new_gradient,
+        }),
+        _ => SoftValue::Float(SoftFloat {
+            val: new_val,
+            gradient: new_gradient,
+        }),
     }
 }
 
@@ -365,7 +424,7 @@ pub fn sigmoid_gradient(u: f64) -> f64 {
 pub fn softgt(x: f64, c: f64, x_grad: Gradient, c_grad: Gradient) -> SoftValue {
     let value = sigmoid(x - c);
 
-    SoftValue {
+    SoftValue::Bool(SoftBool {
         gradient: Gradient {
             values: (x_grad - c_grad)
                 .values
@@ -373,8 +432,8 @@ pub fn softgt(x: f64, c: f64, x_grad: Gradient, c_grad: Gradient) -> SoftValue {
                 .map(|g| g * sigmoid_gradient(x - c))
                 .collect(),
         },
-        value: ValueType::Bool(value),
-    }
+        val: value,
+    })
 }
 
 pub fn make_oneshot(size: usize, pos: crate::ast::LitId) -> Gradient {
@@ -386,10 +445,10 @@ pub fn make_oneshot(size: usize, pos: crate::ast::LitId) -> Gradient {
     Gradient { values: output }
 }
 
-fn get_number_vals(val: &SoftValue) -> f64 {
-    match val.value {
-        ValueType::Int(x) => x,
-        ValueType::Float(x) => x,
+fn get_number_vals(val: &SoftValue) -> (f64, Gradient) {
+    match val {
+        SoftValue::Int(x) => (x.val, x.gradient.clone()),
+        SoftValue::Float(x) => (x.val, x.gradient.clone()),
         _ => unreachable!(),
     }
 }
@@ -429,15 +488,15 @@ fn apply_gradient_expr(expr: &mut ast::Expression, grad: &Gradient) {
 }
 
 fn soft_not(val: SoftValue) -> SoftValue {
-    let new_val = match val.value {
-        ValueType::Bool(a) => ValueType::Bool(1.0 - a),
+    match val {
+        SoftValue::Bool(a) => {
+            let new_grad = a.gradient * -1.0;
+
+            SoftValue::Bool(SoftBool {
+                val: 1.0 - a.val,
+                gradient: new_grad,
+            })
+        }
         _ => unreachable!(),
-    };
-
-    let new_grad = val.gradient * -1.0;
-
-    SoftValue {
-        value: new_val,
-        gradient: new_grad,
     }
 }
