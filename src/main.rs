@@ -22,7 +22,9 @@ fn main() {
         ),
     };
 
-    let mut program_ast = ast::make_program(program_parse_tree);
+    let hard_program_ast = ast::make_program(program_parse_tree.clone(), interpreter::HARD_AST_INIT);
+    let mut soft_program_ast =
+        ast::make_program(program_parse_tree, interpreter_soft::SOFT_AST_INIT);
 
     if let Some(func_name) = args.get(2) {
         let func_args: Vec<interpreter::Value> = args[3..]
@@ -36,43 +38,47 @@ fn main() {
             })
             .collect();
 
-        let val = interpreter::run_function(&program_ast, func_name, func_args.clone());
+        let val = interpreter::run_function(&hard_program_ast, func_name, func_args.clone());
         eprintln!("val = {:?}", val);
 
         let soft_args: Vec<interpreter_soft::SoftValue> = func_args
             .iter()
             .map(|arg| match arg {
-                interpreter::Value::Int(x) => program_ast.make_int(*x as f64),
-                interpreter::Value::Float(x) => program_ast.make_float(*x as f64),
+                interpreter::Value::Int(x) => interpreter_soft::SoftValue::Int(
+                    interpreter_soft::make_int(*x, ast::LitId(None), 100),
+                ),
+                interpreter::Value::Float(x) => interpreter_soft::SoftValue::Float(
+                    interpreter_soft::make_float(*x, ast::LitId(None), 100),
+                ),
                 _ => unreachable!(),
             })
             .collect();
 
-        let soft_val = interpreter_soft::soft_run_function(&program_ast, func_name, soft_args);
+        let soft_val = interpreter_soft::soft_run_function(&soft_program_ast, func_name, soft_args);
 
         eprintln!("soft val = {:?}", soft_val);
-    } else {
+     } else {
         eprintln!(
             "test cases = {:?}",
-            interpreter::eval_test_cases(&program_ast)
+            interpreter::eval_test_cases(&hard_program_ast)
         );
 
-        for _ in 0..5 {
-            let soft_cases = interpreter_soft::soft_eval_test_cases(&program_ast);
+        for _ in 0..10 {
+            let soft_cases = interpreter_soft::soft_eval_test_cases(&soft_program_ast);
 
             eprintln!("soft test cases = {:?}", soft_cases);
 
             let average_grad = soft_cases.into_iter().fold(
-                interpreter_soft::make_oneshot(program_ast.num_ids, crate::ast::LitId(None)),
+                interpreter_soft::make_oneshot(soft_program_ast.num_ids, crate::ast::LitId(None)),
                 |acc, new| acc + new.1,
             );
 
-            interpreter_soft::apply_gradient_program(&mut program_ast, &average_grad);
+            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &average_grad);
         }
 
         eprintln!(
             "test cases fixed maybe = {:?}",
-            interpreter::eval_test_cases(&program_ast)
+            interpreter::eval_test_cases(&hard_program_ast)
         );
     }
 }

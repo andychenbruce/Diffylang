@@ -119,7 +119,7 @@ pub enum SimpleType {
     Bool,
     String,
     List(Box<SimpleType>),
-            // Dict
+    // Dict
 }
 
 #[derive(Clone)]
@@ -186,7 +186,9 @@ impl TryFrom<&ast::TypeName> for SimpleType {
     }
 }
 
-pub fn type_check_program(program: &ast::Program) -> Res<TypeEnv> {
+pub fn type_check_program<IntType, FloatType, BoolType, HardType>(
+    program: &ast::Program<IntType, FloatType, BoolType, HardType>,
+) -> Res<TypeEnv> {
     let env = program
         .functions
         .iter()
@@ -205,7 +207,10 @@ pub fn type_check_program(program: &ast::Program) -> Res<TypeEnv> {
     Ok(env)
 }
 
-fn type_check_func(env: TypeEnv, func: &ast::FunctionDefinition) -> Res<TypeEnv> {
+fn type_check_func<IntType, FloatType, BoolType, HardType>(
+    env: TypeEnv,
+    func: &ast::FunctionDefinition<IntType, FloatType, BoolType, HardType>,
+) -> Res<TypeEnv> {
     let env_with_arguments = func
         .arguments
         .iter()
@@ -239,7 +244,10 @@ fn type_check_func(env: TypeEnv, func: &ast::FunctionDefinition) -> Res<TypeEnv>
     })
 }
 
-fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
+fn find_expr_type<IntType, FloatType, BoolType, HardType>(
+    env: TypeEnv,
+    expr: &ast::Expression<IntType, FloatType, BoolType, HardType>,
+) -> Res<SimpleType> {
     match expr {
         ast::Expression::Variable { ident, span } => {
             Ok(env.find_var_type(ident).ok_or(TypeError::UnknownVariable {
@@ -247,6 +255,7 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
                 ident: ident.clone(),
             })?)
         }
+        ast::Expression::HardInt(_) => Ok(SimpleType::Int),
         ast::Expression::Integer(_, _) => Ok(SimpleType::Int),
         ast::Expression::Str(_, _) => Ok(SimpleType::String),
         ast::Expression::Float(_, _) => Ok(SimpleType::Float),
@@ -345,20 +354,21 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
             body,
             fold_iter,
         } => {
-
-            let iter = match **fold_iter {
+            let iter_type = match **fold_iter {
                 ast::FoldIter::Range(ref start, ref end) => {
                     assert!(matches!(
                         find_expr_type(env.clone(), &start)?,
                         SimpleType::Int
                     ));
                     assert!(matches!(
-                        find_expr_type(env.clone(), &start)?,
+                        find_expr_type(env.clone(), &end)?,
                         SimpleType::Int
                     ));
+
+                    SimpleType::Int
                 }
-                ast::FoldIter::ExprList(ref list) => match eval(env.clone(), &list) {
-                    Value::List(l) => l,
+                ast::FoldIter::ExprList(ref list) => match find_expr_type(env.clone(), &list)? {
+                    SimpleType::List(t) => *t,
                     _ => unreachable!(),
                 },
             };
@@ -377,21 +387,20 @@ fn find_expr_type(env: TypeEnv, expr: &ast::Expression) -> Res<SimpleType> {
         }
         ast::Expression::List { type_name, values } => {
             let list_type: SimpleType = type_name.try_into()?;
-            for value in values{
+            for value in values {
                 if find_expr_type(env.clone(), value)? != list_type {
                     panic!()
                 }
             }
             Ok(SimpleType::List(Box::new(list_type)))
         }
-        
     }
 }
 
-fn validate_comparison(
+fn validate_comparison<IntType, FloatType, BoolType, HardType>(
     env: TypeEnv,
-    left: &ast::Expression,
-    right: &ast::Expression,
+    left: &ast::Expression<IntType, FloatType, BoolType, HardType>,
+    right: &ast::Expression<IntType, FloatType, BoolType, HardType>,
     span: parsel::Span,
 ) -> Res<()> {
     match (
@@ -406,10 +415,10 @@ fn validate_comparison(
     }
 }
 
-fn find_arithmtic_type(
+fn find_arithmtic_type<IntType, FloatType, BoolType, HardType>(
     env: TypeEnv,
-    left: &ast::Expression,
-    right: &ast::Expression,
+    left: &ast::Expression<IntType, FloatType, BoolType, HardType>,
+    right: &ast::Expression<IntType, FloatType, BoolType, HardType>,
     span: parsel::Span,
 ) -> Res<SimpleType> {
     match (

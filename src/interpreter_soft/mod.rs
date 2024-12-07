@@ -2,6 +2,39 @@ use crate::ast;
 
 const SIGMOID_VARIANCE: f64 = 1.0;
 
+pub const SOFT_AST_INIT: ast::ProgramInitFunctions<SoftInt, SoftFloat, SoftBool, i64> =
+    ast::ProgramInitFunctions {
+        make_int,
+        make_float,
+        make_bool,
+        make_hard,
+    };
+
+pub fn make_int(x: i64, lit: ast::LitId, num_ids: usize) -> SoftInt {
+    SoftInt {
+        val: x as f64,
+        gradient: make_oneshot(num_ids, lit),
+    }
+}
+
+pub fn make_float(x: f64, lit: ast::LitId, num_ids: usize) -> SoftFloat {
+    SoftFloat {
+        val: x,
+        gradient: make_oneshot(num_ids, lit),
+    }
+}
+
+pub fn make_bool(x: bool, lit: ast::LitId, num_ids: usize) -> SoftBool {
+    SoftBool {
+        val: if x { 1.0 } else { 0.0 },
+        gradient: make_oneshot(num_ids, lit),
+    }
+}
+
+pub fn make_hard(x: i64) -> i64 {
+    x
+}
+
 #[derive(Clone, Debug)]
 pub struct Gradient {
     values: Vec<f64>,
@@ -53,6 +86,7 @@ impl core::ops::Mul<f64> for Gradient {
 
 #[derive(Clone, Debug)]
 pub enum SoftValue {
+    HardInt(i64),
     Int(SoftInt),
     Float(SoftFloat),
     Bool(SoftBool),
@@ -84,11 +118,11 @@ pub struct SoftList {
 
 #[derive(Clone)]
 struct SoftEnv<'a> {
-    program: &'a ast::Program,
+    program: &'a ast::Program<SoftInt, SoftFloat, SoftBool, i64>,
     vars: SoftEnvVars,
 }
 
-impl ast::Program {
+impl ast::Program<SoftInt, SoftFloat, SoftBool, i64> {
     pub fn make_int(&self, x: f64) -> SoftValue {
         SoftValue::Int(SoftInt {
             val: x,
@@ -132,7 +166,7 @@ impl SoftEnvVars {
 }
 
 pub fn soft_run_function(
-    program: &ast::Program,
+    program: &ast::Program<SoftInt, SoftFloat, SoftBool, i64>,
     func_name: &str,
     arguments: Vec<SoftValue>,
 ) -> SoftValue {
@@ -149,7 +183,9 @@ pub fn soft_run_function(
     )
 }
 
-pub fn soft_eval_test_cases(program: &ast::Program) -> Vec<(f64, Gradient)> {
+pub fn soft_eval_test_cases(
+    program: &ast::Program<SoftInt, SoftFloat, SoftBool, i64>,
+) -> Vec<(f64, Gradient)> {
     program
         .test_cases
         .iter()
@@ -195,19 +231,14 @@ fn soft_apply_function(env: SoftEnv, func_name: &str, arguments: Vec<SoftValue>)
     )
 }
 
-fn soft_eval(env: SoftEnv, expr: &ast::Expression) -> SoftValue {
+fn soft_eval(env: SoftEnv, expr: &ast::Expression<SoftInt, SoftFloat, SoftBool, i64>) -> SoftValue {
     match expr {
         ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
-        ast::Expression::Integer(x, id) => SoftValue::Int(SoftInt {
-            val: *x as f64,
-            gradient: make_oneshot(env.program.num_ids, *id),
-        }),
+        ast::Expression::HardInt(x) => SoftValue::HardInt(*x),
+        ast::Expression::Integer(x, _) => SoftValue::Int(x.clone()),
         ast::Expression::Str(_, _) => todo!(),
-        ast::Expression::Float(x, id) => SoftValue::Float(SoftFloat {
-            val: *x,
-            gradient: make_oneshot(env.program.num_ids, *id),
-        }),
-        ast::Expression::Bool(_, _) => todo!(),
+        ast::Expression::Float(x, _) => SoftValue::Float(x.clone()),
+        ast::Expression::Bool(x, _) => SoftValue::Bool(x.clone()),
         ast::Expression::FuncApplication {
             func_name,
             args,
@@ -453,18 +484,22 @@ fn get_number_vals(val: &SoftValue) -> (f64, Gradient) {
     }
 }
 
-pub fn apply_gradient_program(program: &mut ast::Program, grad: &Gradient) {
+pub fn apply_gradient_program(
+    program: &mut ast::Program<SoftInt, SoftFloat, SoftBool, i64>,
+    grad: &Gradient,
+) {
     for function in program.functions.iter_mut() {
         apply_gradient_expr(&mut function.body, grad);
     }
 }
 
-fn apply_gradient_expr(expr: &mut ast::Expression, grad: &Gradient) {
+fn apply_gradient_expr(
+    expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool, i64>,
+    grad: &Gradient,
+) {
     match expr {
-        ast::Expression::Integer(val, id) => {
-            *expr = ast::Expression::Float((*val as f64) + grad.values[id.0.unwrap()], *id)
-        }
-        ast::Expression::Float(val, id) => *val += grad.values[id.0.unwrap()],
+        ast::Expression::Integer(val, id) => val.val += grad.values[id.0.unwrap()],
+        ast::Expression::Float(val, id) => val.val += grad.values[id.0.unwrap()],
         ast::Expression::Str(_, _) => todo!(),
         ast::Expression::Bool(_, _) => todo!(),
         ast::Expression::FuncApplication {
