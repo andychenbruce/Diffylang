@@ -1,7 +1,5 @@
-use super::Program;
-
-#[derive(Clone)]
-enum EvalVal<IntType, FloatType, BoolType, HardType> {
+#[derive(Clone, Debug)]
+pub enum EvalVal<IntType, FloatType, BoolType, HardType> {
     Int(IntType),
     Float(FloatType),
     Bool(BoolType),
@@ -27,35 +25,45 @@ enum EnvVars<IntType, FloatType, BoolType, HardType> {
     },
 }
 
-trait Evaluator<IntType, FloatType, BoolType, HardType> {
+pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
     fn eval_addition_ints(a: IntType, b: IntType) -> IntType;
     fn eval_addition_floats(a: FloatType, b: FloatType) -> FloatType;
-    fn eval_multiplication_intfn(a: IntType, b: IntType) -> IntType;
+    fn eval_multiplication_int(a: IntType, b: IntType) -> IntType;
     fn eval_multiplication_floats(a: FloatType, b: FloatType) -> FloatType;
     fn eval_negation_int(a: IntType) -> IntType;
     fn eval_negation_float(a: FloatType) -> FloatType;
     fn eval_equality_ints(a: IntType, b: IntType) -> BoolType;
     fn eval_equality_floats(a: FloatType, b: FloatType) -> BoolType;
+    fn eval_less_than_ints(a: IntType, b: IntType) -> BoolType;
+    fn eval_less_than_floats(a: FloatType, b: FloatType) -> BoolType;
     fn eval_not(a: BoolType) -> BoolType;
     fn eval_if(
         cond: BoolType,
         true_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
         false_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
-
     fn make_range(start: IntType, end: IntType) -> Vec<IntType>;
 }
 
-struct FuncTable {}
-
-fn traverse_eval<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
-    program: Program<IntType, FloatType, BoolType, HardType>,
-    evaluator: E,
+pub fn run_function<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+    program: &super::Program<IntType, FloatType, BoolType, HardType>,
+    func_name: &str,
+    arguments: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
 ) -> EvalVal<IntType, FloatType, BoolType, HardType>
 where
     E: Evaluator<IntType, FloatType, BoolType, HardType>,
 {
-    todo!()
+    let _type_env: crate::type_checker::TypeEnv =
+        crate::type_checker::type_check_program(program).unwrap();
+
+    apply_function::<IntType, FloatType, BoolType, HardType, E>(
+        Env {
+            program,
+            vars: EnvVars::End,
+        },
+        func_name,
+        arguments,
+    )
 }
 
 impl<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone>
@@ -78,7 +86,7 @@ impl<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone>
     }
 }
 
-fn eval<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+pub fn eval<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
     env: Env<IntType, FloatType, BoolType, HardType>,
     expr: &super::Expression<IntType, FloatType, BoolType, HardType>,
 ) -> EvalVal<IntType, FloatType, BoolType, HardType>
@@ -97,7 +105,7 @@ where
             args,
             span: _, // eval_subtraction(env, &args[0], &args[1]),
         } => match func_name.0.as_str() {
-            "__add" | "__sub" | "__mul" | "__div" | "__eq" | "__gt" | "__lt" | "__and" | "__or" => {
+            "__add" | "__sub" | "__mul" | "__div" | "__eq" | "__lt" | "__gt" | "__and" | "__or" => {
                 match (
                     eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]),
                     eval::<IntType, FloatType, BoolType, HardType, E>(env, &args[1]),
@@ -105,9 +113,21 @@ where
                     (EvalVal::Int(a), EvalVal::Int(b)) => match func_name.0.as_str() {
                         "__add" => EvalVal::Int(E::eval_addition_ints(a, b)),
                         "__sub" => EvalVal::Int(E::eval_addition_ints(a, E::eval_negation_int(b))),
-                        "__mul" => EvalVal::Int(E::eval_multiplication_intfn(a, b)),
+                        "__mul" => EvalVal::Int(E::eval_multiplication_int(a, b)),
                         "__div" => todo!(),
                         "__eq" => EvalVal::Bool(E::eval_equality_ints(a, b)),
+                        "__lt" => EvalVal::Bool(E::eval_less_than_ints(a, b)),
+                        "__gt" => EvalVal::Bool(E::eval_less_than_ints(b, a)),
+                        _ => todo!(),
+                    },
+                    (EvalVal::Float(a), EvalVal::Float(b)) => match func_name.0.as_str() {
+                        "__add" => EvalVal::Float(E::eval_addition_floats(a, b)),
+                        "__sub" => EvalVal::Float(E::eval_addition_floats(a, E::eval_negation_float(b))),
+                        "__mul" => EvalVal::Float(E::eval_multiplication_floats(a, b)),
+                        "__div" => todo!(),
+                        "__eq" => EvalVal::Bool(E::eval_equality_floats(a, b)),
+                        "__lt" => EvalVal::Bool(E::eval_less_than_floats(a, b)),
+                        "__gt" => EvalVal::Bool(E::eval_less_than_floats(b, a)),
                         _ => todo!(),
                     },
                     _ => todo!(),
@@ -217,7 +237,12 @@ where
         super::Expression::List {
             type_name: _,
             values,
-        } => EvalVal::List(values.into_iter().map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x)).collect()),
+        } => EvalVal::List(
+            values
+                .into_iter()
+                .map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x))
+                .collect(),
+        ),
     }
 }
 
@@ -249,4 +274,25 @@ where
         },
         &func.body,
     )
+}
+
+pub fn eval_test_cases<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+    program: &super::Program<IntType, FloatType, BoolType, HardType>,
+) -> Vec<EvalVal<IntType, FloatType, BoolType, HardType>>
+where
+    E: Evaluator<IntType, FloatType, BoolType, HardType>,
+{
+    program
+        .test_cases
+        .iter()
+        .map(|test_case| {
+            crate::ast::eval::eval::<IntType, FloatType, BoolType, HardType, E>(
+                Env {
+                    program,
+                    vars: EnvVars::End,
+                },
+                test_case,
+            )
+        })
+        .collect()
 }

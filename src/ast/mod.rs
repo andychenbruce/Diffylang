@@ -1,4 +1,4 @@
-mod eval;
+pub mod eval;
 use parsel::Spanned;
 
 #[derive(serde::Serialize, Clone, Debug, PartialEq)]

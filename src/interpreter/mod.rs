@@ -1,44 +1,6 @@
 use crate::ast;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value {
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    List(Vec<Value>),
-}
-
-#[derive(Clone)]
-struct Env<'a> {
-    program: &'a ast::Program<Value, Value, Value, i64>,
-    vars: EnvVars,
-}
-
-#[derive(Clone)]
-enum EnvVars {
-    End,
-    Rest {
-        first: (ast::Identifier, Value),
-        rest: Box<EnvVars>,
-    },
-}
-
-impl EnvVars {
-    fn lookup_var(&self, var_name: &ast::Identifier) -> Value {
-        match self {
-            EnvVars::End => unreachable!(),
-            EnvVars::Rest { first, rest } => {
-                if first.0 == *var_name {
-                    first.1.clone()
-                } else {
-                    rest.lookup_var(var_name)
-                }
-            }
-        }
-    }
-}
-
-pub const HARD_AST_INIT: ast::ProgramInitFunctions<Value, Value, Value, i64> =
+pub const HARD_AST_INIT: ast::ProgramInitFunctions<i64, f64, bool, i64> =
     ast::ProgramInitFunctions {
         make_int,
         make_float,
@@ -46,279 +8,78 @@ pub const HARD_AST_INIT: ast::ProgramInitFunctions<Value, Value, Value, i64> =
         make_hard,
     };
 
-fn make_int(x: i64, _: ast::LitId, _: usize) -> Value {
-    Value::Int(x)
+fn make_int(x: i64, _: ast::LitId, _: usize) -> i64 {
+    x
 }
 
-fn make_float(x: f64, _: ast::LitId, _: usize) -> Value {
-    Value::Float(x)
+fn make_float(x: f64, _: ast::LitId, _: usize) -> f64 {
+    x
 }
-fn make_bool(x: bool, _: ast::LitId, _: usize) -> Value {
-    Value::Bool(x)
+fn make_bool(x: bool, _: ast::LitId, _: usize) -> bool {
+    x
 }
 fn make_hard(x: i64) -> i64 {
     x
 }
 
-pub fn run_function(
-    program: &ast::Program<Value, Value, Value, i64>,
-    func_name: &str,
-    arguments: Vec<Value>,
-) -> Value {
-    let _type_env: crate::type_checker::TypeEnv =
-        crate::type_checker::type_check_program(program).unwrap();
+pub struct HardEvaluator {}
 
-    apply_function(
-        Env {
-            program,
-            vars: EnvVars::End,
-        },
-        func_name,
-        arguments,
-    )
-}
+impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
+    fn eval_addition_ints(a: i64, b: i64) -> i64 {
+        a + b
+    }
 
-pub fn eval_test_cases(program: &ast::Program<Value, Value, Value, i64>) -> Vec<Value> {
-    program
-        .test_cases
-        .iter()
-        .map(|test_case| {
-            eval(
-                Env {
-                    program,
-                    vars: EnvVars::End,
-                },
-                test_case,
-            )
-        })
-        .collect()
-}
+    fn eval_addition_floats(a: f64, b: f64) -> f64 {
+        a + b
+    }
 
-fn apply_function(env: Env, func_name: &str, arguments: Vec<Value>) -> Value {
-    let func = env.program.find_func(func_name);
+    fn eval_multiplication_int(a: i64, b: i64) -> i64 {
+        a * b
+    }
 
-    assert!(arguments.len() == func.arguments.len());
+    fn eval_multiplication_floats(a: f64, b: f64) -> f64 {
+        a * b
+    }
 
-    let env_with_args = arguments
-        .into_iter()
-        .zip(func.arguments.iter())
-        .map(|(arg_val, arg)| (arg.0.clone(), arg_val))
-        .fold(EnvVars::End, |acc, x| EnvVars::Rest {
-            first: x,
-            rest: Box::new(acc),
-        });
+    fn eval_negation_int(a: i64) -> i64 {
+        -a
+    }
 
-    eval(
-        Env {
-            program: env.program,
-            vars: env_with_args,
-        },
-        &func.body,
-    )
-}
+    fn eval_negation_float(a: f64) -> f64 {
+        -a
+    }
 
-fn eval(env: Env, expr: &ast::Expression<Value, Value, Value, i64>) -> Value {
-    match expr {
-        ast::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
-        ast::Expression::Integer(x, _) => x.clone(),
-        ast::Expression::HardInt(x) => Value::Int(*x),
-        ast::Expression::Str(_, _) => todo!(),
-        ast::Expression::Float(x, _) => x.clone(),
-        ast::Expression::Bool(x, _) => x.clone(),
-        ast::Expression::FuncApplication {
-            func_name,
-            args,
-            span: _,
-        } => match func_name.0.as_str() {
-            "__add" => eval_addition(env, &args[0], &args[1]),
-            "__sub" => eval_subtraction(env, &args[0], &args[1]),
-            "__mul" => eval_multiplication(env, &args[0], &args[1]),
-            "__div" => todo!(),
-            "__eq" => todo!(),
-            "__gt" => eval_greater_than(env, &args[0], &args[1]),
-            "__lt" => eval_less_than(env, &args[0], &args[1]),
-            "__and" => todo!(),
-            "__or" => todo!(),
-            "__not" => eval_not(env, &args[0]),
-            func_name => apply_function(
-                env.clone(),
-                func_name,
-                args.iter().map(|x| eval(env.clone(), x)).collect(),
-            ),
-        },
-        ast::Expression::ExprWhere { bindings, inner } => {
-            let new_env = bindings.iter().fold(env.vars, |acc, x| EnvVars::Rest {
-                first: (
-                    x.ident.clone(),
-                    eval(
-                        Env {
-                            program: env.program,
-                            vars: acc.clone(),
-                        },
-                        &x.value,
-                    ),
-                ),
-                rest: Box::new(acc),
-            });
+    fn eval_equality_ints(a: i64, b: i64) -> bool {
+        a == b
+    }
 
-            eval(
-                Env {
-                    program: env.program,
-                    vars: new_env,
-                },
-                inner,
-            )
+    fn eval_equality_floats(a: f64, b: f64) -> bool {
+        a == b
+    }
+
+    fn eval_not(a: bool) -> bool {
+        !a
+    }
+    fn eval_less_than_ints(a: i64, b: i64) -> bool {
+        a < b
+    }
+
+    fn eval_less_than_floats(a: f64, b: f64) -> bool {
+        a < b
+    }
+    fn eval_if(
+        cond: bool,
+        true_branch: ast::eval::EvalVal<i64, f64, bool, i64>,
+        false_branch: ast::eval::EvalVal<i64, f64, bool, i64>,
+    ) -> ast::eval::EvalVal<i64, f64, bool, i64> {
+        if cond {
+            true_branch
+        } else {
+            false_branch
         }
-        ast::Expression::IfThenElse {
-            boolean,
-            true_expr,
-            false_expr,
-        } => {
-            if let Value::Bool(boolean) = eval(env.clone(), boolean) {
-                if boolean {
-                    eval(env.clone(), true_expr)
-                } else {
-                    eval(env.clone(), false_expr)
-                }
-            } else {
-                panic!()
-            }
-        }
-        ast::Expression::FoldLoop {
-            fold_iter,
-            accumulator,
-            body,
-        } => {
-            let iter = match **fold_iter {
-                ast::FoldIter::Range(ref start, ref end) => {
-                    let start = match eval(env.clone(), &start) {
-                        Value::Int(x) => x,
-                        _ => unreachable!(),
-                    } as usize;
-
-                    let end = match eval(env.clone(), &end) {
-                        Value::Int(x) => x,
-                        _ => unreachable!(),
-                    } as usize;
-
-                    (start..end).map(|x| Value::Int(x as i64)).collect()
-                }
-                ast::FoldIter::ExprList(ref list) => match eval(env.clone(), &list) {
-                    Value::List(l) => l,
-                    _ => unreachable!(),
-                },
-            };
-            iter.into_iter()
-                .fold(eval(env.clone(), &accumulator.1), |acc, _| {
-                    let new_vars = EnvVars::Rest {
-                        first: (accumulator.0.clone(), acc),
-                        rest: Box::new(env.vars.clone()),
-                    };
-                    let new_env = Env {
-                        program: env.program,
-                        vars: new_vars,
-                    };
-
-                    eval(new_env, body)
-                })
-        }
-        ast::Expression::List {
-            type_name: _,
-            values,
-        } => Value::List(values.into_iter().map(|x| eval(env.clone(), x)).collect()),
     }
-}
 
-fn eval_addition(
-    env: Env,
-    left: &ast::Expression<Value, Value, Value, i64>,
-    right: &ast::Expression<Value, Value, Value, i64>,
-) -> Value {
-    let left_val = eval(env.clone(), left);
-    let right_val = eval(env.clone(), right);
-
-    match (left_val, right_val) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
-        (Value::Float(a), Value::Int(b)) => Value::Float(a + (b as f64)),
-        (Value::Int(a), Value::Float(b)) => Value::Float((a as f64) + b),
-        (Value::Float(a), Value::Float(b)) => Value::Float(a + b),
-        _ => unreachable!(),
-    }
-}
-
-fn eval_subtraction(
-    env: Env,
-    left: &ast::Expression<Value, Value, Value, i64>,
-    right: &ast::Expression<Value, Value, Value, i64>,
-) -> Value {
-    let left_val = eval(env.clone(), left);
-    let right_val = eval(env.clone(), right);
-
-    match (left_val, right_val) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
-        (Value::Float(a), Value::Int(b)) => Value::Float(a - (b as f64)),
-        (Value::Int(a), Value::Float(b)) => Value::Float((a as f64) - b),
-        (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
-        _ => unreachable!(),
-    }
-}
-
-fn eval_multiplication(
-    env: Env,
-    left: &ast::Expression<Value, Value, Value, i64>,
-    right: &ast::Expression<Value, Value, Value, i64>,
-) -> Value {
-    let left_val = eval(env.clone(), left);
-    let right_val = eval(env.clone(), right);
-
-    match (left_val, right_val) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
-        (Value::Float(a), Value::Int(b)) => Value::Float(a * (b as f64)),
-        (Value::Int(a), Value::Float(b)) => Value::Float((a as f64) * b),
-        (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
-        _ => unreachable!(),
-    }
-}
-
-fn eval_greater_than(
-    env: Env,
-    left: &ast::Expression<Value, Value, Value, i64>,
-    right: &ast::Expression<Value, Value, Value, i64>,
-) -> Value {
-    let left_val = eval(env.clone(), left);
-    let right_val = eval(env.clone(), right);
-
-    match (left_val, right_val) {
-        (Value::Int(a), Value::Int(b)) => Value::Bool(a > b),
-        (Value::Float(a), Value::Int(b)) => Value::Bool(a > (b as f64)),
-        (Value::Int(a), Value::Float(b)) => Value::Bool((a as f64) > b),
-        (Value::Float(a), Value::Float(b)) => Value::Bool(a > b),
-        _ => unreachable!(),
-    }
-}
-
-fn eval_less_than(
-    env: Env,
-    left: &ast::Expression<Value, Value, Value, i64>,
-    right: &ast::Expression<Value, Value, Value, i64>,
-) -> Value {
-    let left_val = eval(env.clone(), left);
-    let right_val = eval(env.clone(), right);
-
-    match (left_val, right_val) {
-        (Value::Int(a), Value::Int(b)) => Value::Bool(a < b),
-        (Value::Float(a), Value::Int(b)) => Value::Bool(a < (b as f64)),
-        (Value::Int(a), Value::Float(b)) => Value::Bool((a as f64) < b),
-        (Value::Float(a), Value::Float(b)) => Value::Bool(a < b),
-        _ => unreachable!(),
-    }
-}
-
-fn eval_not(env: Env, val: &ast::Expression<Value, Value, Value, i64>) -> Value {
-    let val = eval(env.clone(), val);
-
-    match val {
-        Value::Bool(a) => Value::Bool(!a),
-        _ => unreachable!(),
+    fn make_range(start: i64, end: i64) -> Vec<i64> {
+        (start..end).collect()
     }
 }
