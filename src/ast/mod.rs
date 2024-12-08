@@ -1,3 +1,4 @@
+mod eval;
 use parsel::Spanned;
 
 #[derive(serde::Serialize, Clone, Debug, PartialEq)]
@@ -429,3 +430,6 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
         }
     }
 }
+
+
+

@@ -3,6 +3,7 @@ mod interpreter;
 mod interpreter_soft;
 mod parser;
 mod type_checker;
+mod ast_hardening;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

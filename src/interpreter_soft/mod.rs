@@ -535,3 +535,4 @@ fn soft_not(val: SoftValue) -> SoftValue {
         _ => unreachable!(),
     }
 }
+
