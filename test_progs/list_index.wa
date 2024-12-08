@@ -1,0 +1,7 @@
+
+
+[index_list
+  ((l : int), (x : int)) -> bool
+  (__index(l, (x + 1)))];
+
+{(index_list({int ; 20, 100, 20, 0, 0, 0, 0}, 1) == 100)};

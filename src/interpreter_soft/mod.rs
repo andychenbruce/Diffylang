@@ -1,6 +1,7 @@
 use crate::ast;
 
 const SIGMOID_VARIANCE: f64 = 1.0;
+const EQUALITY_VARIANCE: f64 = 1000.0;
 
 pub type SoftValue = ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>;
 
@@ -37,7 +38,7 @@ pub fn make_hard(x: i64) -> i64 {
     x
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Gradient {
     values: Vec<f64>,
 }
@@ -86,19 +87,19 @@ impl core::ops::Mul<f64> for Gradient {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct SoftInt {
     pub val: f64,
     pub gradient: Gradient,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct SoftFloat {
     pub val: f64,
     pub gradient: Gradient,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct SoftBool {
     pub val: f64,
     pub gradient: Gradient,
@@ -219,9 +220,10 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     fn eval_equality_ints(a: SoftInt, b: SoftInt) -> SoftBool {
         let diff = a.val - b.val;
         let diff_grad = a.gradient - b.gradient;
-
-        let val = (-(diff * diff) / 4.0).exp();
-        let val_grad = diff_grad * (((1.0 / 4.0) * ((diff * diff) / 4.0).exp()) * (2.0 * diff)); //chain rule
+        let val = (-(diff * diff) / EQUALITY_VARIANCE).exp();
+        let val_grad = diff_grad
+            * (((-1.0 / EQUALITY_VARIANCE) * (-(diff * diff) / EQUALITY_VARIANCE).exp())
+                * (2.0 * diff)); //chain rule
 
         SoftBool {
             val,
@@ -233,8 +235,10 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
         let diff = a.val - b.val;
         let diff_grad = a.gradient - b.gradient;
 
-        let val = (-(diff * diff) / 4.0).exp();
-        let val_grad = diff_grad * (((1.0 / 4.0) * ((diff * diff) / 4.0).exp()) * (2.0 * diff)); //chain rule
+        let val = (-(diff * diff) / EQUALITY_VARIANCE).exp();
+        let val_grad = diff_grad
+            * (((1.0 / EQUALITY_VARIANCE) * ((diff * diff) / EQUALITY_VARIANCE).exp())
+                * (2.0 * diff)); //chain rule
 
         SoftBool {
             val,
@@ -359,5 +363,95 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
 
     fn make_range(_start: SoftInt, _end: SoftInt) -> Vec<SoftInt> {
         todo!()
+    }
+
+    fn eval_index(
+        l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
+        i: SoftInt,
+    ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
+        const SIGMA: f64 = 1.0;
+        println!("i = {:?}", i);
+        let stuff = l
+            .iter()
+            .enumerate()
+            .map(|(p, v)| {
+                let bott_val = (p as f64) - i.val - 0.5;
+                let top_val = (p as f64) - i.val + 0.5;
+                let bottom_cdf = if p == 0 {
+                    0.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_P(bott_val, SIGMA)
+                };
+                let top_cdf = if p == (l.len() - 1) {
+                    1.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_P(top_val, SIGMA)
+                };
+
+                let cdf = top_cdf - bottom_cdf;
+                let bottom_pdf = if p == 0 {
+                    0.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_pdf(bott_val, SIGMA)
+                };
+                let top_pdf = if p == (l.len() - 1) {
+                    0.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_pdf(top_val, SIGMA)
+                };
+
+                let index_grad = i.gradient.clone() * -1.0 * (top_pdf - bottom_pdf);
+                match v {
+                    ast::eval::EvalVal::Int(x) => {
+                        ast::eval::EvalVal::<SoftInt, SoftFloat, SoftBool, i64>::Int(
+                            Self::eval_multiplication_int(
+                                x.clone(),
+                                SoftInt {
+                                    val: cdf,
+                                    gradient: index_grad,
+                                },
+                            ),
+                        )
+                    }
+                    ast::eval::EvalVal::Float(_) => todo!(),
+                    ast::eval::EvalVal::Bool(_) => todo!(),
+                    _ => todo!(),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        match stuff[0].clone() {
+            ast::eval::EvalVal::Float(x) => ast::eval::EvalVal::Float(stuff.into_iter().fold(
+                SoftFloat {
+                    val: 0.0,
+                    gradient: make_oneshot(x.gradient.values.len(), crate::ast::LitId(None)),
+                },
+                |acc, val| {
+                    if let ast::eval::EvalVal::Float(other) = val {
+                        Self::eval_addition_floats(acc, other)
+                    } else {
+                        panic!()
+                    }
+                },
+            )),
+            ast::eval::EvalVal::Int(x) => ast::eval::EvalVal::Int(stuff.into_iter().fold(
+                SoftInt {
+                    val: 0.0,
+                    gradient: make_oneshot(x.gradient.values.len(), crate::ast::LitId(None)),
+                },
+                |acc, val| {
+                    if let ast::eval::EvalVal::Int(other) = val {
+                        Self::eval_addition_ints(acc, other)
+                    } else {
+                        panic!()
+                    }
+                },
+            )),
+            _ => todo!(),
+        }
+    }
+
+    fn eval_len(l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>) -> i64 {
+        l.len() as i64
     }
 }

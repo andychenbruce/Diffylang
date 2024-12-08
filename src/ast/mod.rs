@@ -7,7 +7,7 @@ pub struct Identifier(pub String);
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct TypeName(pub String);
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct Program<IntType, FloatType, BoolType, HardType> {
     pub functions: Vec<FunctionDefinition<IntType, FloatType, BoolType, HardType>>,
     pub test_cases: Vec<Expression<IntType, FloatType, BoolType, HardType>>,
@@ -42,7 +42,7 @@ struct AstConversionState {
     total: usize,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct FunctionDefinition<IntType, FloatType, BoolType, HardType> {
     pub name: Identifier,
     pub arguments: Vec<(Identifier, TypeName)>,
@@ -53,7 +53,7 @@ pub struct FunctionDefinition<IntType, FloatType, BoolType, HardType> {
 #[derive(serde::Serialize, Copy, Clone)]
 pub struct LitId(pub Option<usize>);
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub enum Expression<IntType, FloatType, BoolType, HardType> {
     Variable {
         ident: Identifier,
@@ -94,7 +94,7 @@ pub enum Expression<IntType, FloatType, BoolType, HardType> {
     },
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub enum FoldIter<IntType, FloatType, BoolType, HardType> {
     ExprList(Expression<IntType, FloatType, BoolType, HardType>),
     Range(
@@ -103,7 +103,7 @@ pub enum FoldIter<IntType, FloatType, BoolType, HardType> {
     ),
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct LetBind<IntType, FloatType, BoolType, HardType> {
     pub ident: Identifier,
     pub value: Expression<IntType, FloatType, BoolType, HardType>,
@@ -220,9 +220,10 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
     funcs: &ProgramInitFunctions<IntType, FloatType, BoolType, HardType>,
     value: crate::parser::Expression,
 ) -> Expression<IntType, FloatType, BoolType, HardType> {
+    let span = value.span();
     match value {
         crate::parser::Expression::Variable(ref x) => Expression::Variable {
-            span: value.span(),
+            span,
             ident: Identifier(x.to_string()),
         },
         crate::parser::Expression::IntegerLit(x) => {
@@ -268,7 +269,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::Subtraction(ref x) => Expression::FuncApplication {
             func_name: Identifier("__sub".to_owned()),
@@ -276,7 +277,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::Multiplication(ref x) => Expression::FuncApplication {
             func_name: Identifier("__mul".to_owned()),
@@ -284,7 +285,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::Division(ref x) => Expression::FuncApplication {
             func_name: Identifier("__div".to_owned()),
@@ -292,7 +293,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::Equality(ref x) => Expression::FuncApplication {
             func_name: Identifier("__eq".to_owned()),
@@ -300,7 +301,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::GreaterThan(ref x) => Expression::FuncApplication {
             func_name: Identifier("__gt".to_owned()),
@@ -308,7 +309,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::LessThan(ref x) => Expression::FuncApplication {
             func_name: Identifier("__lt".to_owned()),
@@ -316,7 +317,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::And(ref x) => Expression::FuncApplication {
             func_name: Identifier("__and".to_owned()),
@@ -324,7 +325,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::Or(ref x) => Expression::FuncApplication {
             func_name: Identifier("__or".to_owned()),
@@ -332,7 +333,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 make_expression(state, funcs, *x.left_side.clone()),
                 make_expression(state, funcs, *x.right_side.clone()),
             ],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::Not {
             exclamation_mark: _,
@@ -340,13 +341,13 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
         } => Expression::FuncApplication {
             func_name: Identifier("__not".to_owned()),
             args: vec![make_expression(state, funcs, *inner.clone())],
-            span: value.span(),
+            span,
         },
         crate::parser::Expression::FunctionApplication {
             ref func_name,
             ref args,
         } => Expression::FuncApplication {
-            span: value.span(),
+            span,
             func_name: Identifier(func_name.to_string()),
             args: args
                 .clone()

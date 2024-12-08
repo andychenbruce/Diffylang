@@ -89,4 +89,22 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     fn make_range(start: i64, end: i64) -> Vec<i64> {
         (start..end).collect()
     }
+
+    fn eval_index(
+        l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
+        i: i64,
+    ) -> ast::eval::EvalVal<i64, f64, bool, i64> {
+        println!("BRUH");
+        if i < 0 {
+            l[0].clone()
+        } else if i as usize >= l.len() - 1 {
+            l.last().unwrap().clone()
+        } else {
+            l[i as usize].clone()
+        }
+    }
+
+    fn eval_len(l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>) -> i64 {
+        l.len() as i64
+    }
 }

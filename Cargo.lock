@@ -3,9 +3,30 @@
 version = 3
 
 [[package]]
+name = "GSL"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db3943d5a15b5c46e991124abee6a1bc89c7c9ffb25dbb8aeb4eab926fd9b307"
+dependencies = [
+ "GSL-sys",
+ "paste",
+]
+
+[[package]]
+name = "GSL-sys"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4577670dcc0720995dc39f04c438595eaae8ccc27f4aafd3e572dd408d01bd9d"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "WangAnLAng"
 version = "0.1.0"
 dependencies = [
+ "GSL",
  "parsel",
  "serde",
  "serde_json",
@@ -105,6 +126,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
+name = "libc"
+version = "0.2.167"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09d6582e104315a817dff97f75133544b2e094ee22447d2acf4a74e189ba06fc"
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -158,6 +185,18 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pkg-config"
+version = "0.3.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
 name = "proc-macro-crate"

@@ -39,6 +39,11 @@ pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
     fn eval_not(a: BoolType) -> BoolType;
     fn eval_and(a: BoolType, b: BoolType) -> BoolType;
     fn eval_or(a: BoolType, b: BoolType) -> BoolType;
+    fn eval_index(
+        l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
+        i: IntType,
+    ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
+    fn eval_len(l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>) -> HardType;
     fn eval_if(
         cond: BoolType,
         true_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
@@ -142,6 +147,22 @@ where
             "__not" => {
                 match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]) {
                     EvalVal::Bool(x) => EvalVal::Bool(E::eval_not(x)),
+                    _ => todo!(),
+                }
+            }
+
+            "__index" => {
+                match (
+                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[1]),
+                ) {
+                    (EvalVal::List(l), EvalVal::Int(i)) => E::eval_index(l, i),
+                    _ => todo!(),
+                }
+            }
+            "__len" => {
+                match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]) {
+                    EvalVal::List(l) => EvalVal::Hard(E::eval_len(l)),
                     _ => todo!(),
                 }
             }

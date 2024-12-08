@@ -50,10 +50,10 @@ fn main() {
             .iter()
             .map(|arg| match arg {
                 ast::eval::EvalVal::Int(x) => interpreter_soft::SoftValue::Int(
-                    interpreter_soft::make_int(*x, ast::LitId(None), 100),
+                    interpreter_soft::make_int(*x, ast::LitId(None), soft_program_ast.num_ids),
                 ),
                 ast::eval::EvalVal::Float(x) => interpreter_soft::SoftValue::Float(
-                    interpreter_soft::make_float(*x, ast::LitId(None), 100),
+                    interpreter_soft::make_float(*x, ast::LitId(None), soft_program_ast.num_ids),
                 ),
                 _ => unreachable!(),
             })
@@ -72,13 +72,13 @@ fn main() {
             ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hard_program_ast)
         );
 
-        for _ in 0..10 {
+        for _ in 0..300 {
             let soft_cases =
                 ast::eval::eval_test_cases::<_, _, _, _, interpreter_soft::SoftEvaluator>(
                     &soft_program_ast,
                 );
 
-            eprintln!("soft test cases = {:?}", soft_cases);
+            // eprintln!("soft test cases = {:?}", soft_cases);
 
             let average_grad = soft_cases.into_iter().fold(
                 interpreter_soft::make_oneshot(soft_program_ast.num_ids, crate::ast::LitId(None)),
@@ -90,10 +90,10 @@ fn main() {
                 },
             );
 
-            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &average_grad);
+            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &(average_grad * 10.0));
         }
 
-        let hardened_ast = ast_hardening::harden_ast(soft_program_ast);
+        let hardened_ast = ast_hardening::harden_ast(soft_program_ast.clone());
 
         eprintln!(
             "test cases fixed maybe = {:?}",

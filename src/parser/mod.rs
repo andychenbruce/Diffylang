@@ -50,6 +50,7 @@ pub struct VarType {
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub enum Expression {
+    ListLit(parsel::ast::Brace<ListInner>),
     FoldLoop {
         fold_token: kw::fold,
         #[parsel(recursive)]
@@ -58,18 +59,19 @@ pub enum Expression {
         #[parsel(recursive)]
         body: Box<Expression>,
     },
+
     FunctionApplication {
         func_name: parsel::ast::Ident,
         #[parsel(recursive)]
         args: parsel::ast::Paren<parsel::ast::Punctuated<Box<Expression>, Token![,]>>,
     },
+
     Variable(parsel::ast::Ident),
     IntegerLit(parsel::ast::LitInt),
     StringLit(parsel::ast::LitStr),
     FloatLit(parsel::ast::LitFloat),
     BoolLit(parsel::ast::LitBool),
 
-    ListLit(parsel::ast::Brace<ListInner>),
     Addition(parsel::ast::Paren<BinaryOp<Token![+]>>),
     Subtraction(parsel::ast::Paren<BinaryOp<Token![-]>>),
     Multiplication(parsel::ast::Paren<BinaryOp<Token![*]>>),
@@ -79,6 +81,7 @@ pub enum Expression {
     LessThan(parsel::ast::Paren<BinaryOp<Token![<]>>),
     And(parsel::ast::Paren<BinaryOp<Token![&&]>>),
     Or(parsel::ast::Paren<BinaryOp<Token![||]>>),
+
     Not {
         exclamation_mark: Token![!],
         #[parsel(recursive)]
@@ -102,6 +105,12 @@ pub enum Expression {
         #[parsel(recursive)]
         false_expr: Box<Expression>,
     },
+    //     ListIndex{
+    //     #[parsel(recursive)]
+    //     list: Box<Expression>,
+    //     #[parsel(recursive)]
+    //     index: parsel::ast::Brace<Box<Expression>>
+    // },
 }
 
 #[derive(Clone, Debug, Parse, ToTokens)]
