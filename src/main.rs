@@ -3,7 +3,6 @@ mod ast_hardening;
 mod interpreter;
 mod interpreter_soft;
 mod parser;
-mod type_checker;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -95,7 +94,7 @@ fn main() {
         }
 
         let hardened_ast = ast_hardening::harden_ast(soft_program_ast);
-        
+
         eprintln!(
             "test cases fixed maybe = {:?}",
             ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hardened_ast)

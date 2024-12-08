@@ -217,11 +217,29 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     }
 
     fn eval_equality_ints(a: SoftInt, b: SoftInt) -> SoftBool {
-        todo!()
+        let diff = a.val - b.val;
+        let diff_grad = a.gradient - b.gradient;
+
+        let val = (-(diff * diff) / 4.0).exp();
+        let val_grad = diff_grad * (((1.0 / 4.0) * ((diff * diff) / 4.0).exp()) * (2.0 * diff)); //chain rule
+
+        SoftBool {
+            val,
+            gradient: val_grad,
+        }
     }
 
     fn eval_equality_floats(a: SoftFloat, b: SoftFloat) -> SoftBool {
-        todo!()
+        let diff = a.val - b.val;
+        let diff_grad = a.gradient - b.gradient;
+
+        let val = (-(diff * diff) / 4.0).exp();
+        let val_grad = diff_grad * (((1.0 / 4.0) * ((diff * diff) / 4.0).exp()) * (2.0 * diff)); //chain rule
+
+        SoftBool {
+            val,
+            gradient: val_grad,
+        }
     }
 
     fn eval_less_than_ints(a: SoftInt, b: SoftInt) -> SoftBool {
@@ -240,7 +258,18 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     }
 
     fn eval_less_than_floats(a: SoftFloat, b: SoftFloat) -> SoftBool {
-        todo!()
+        let value = sigmoid(b.val - a.val);
+
+        SoftBool {
+            gradient: Gradient {
+                values: (b.gradient - a.gradient)
+                    .values
+                    .iter()
+                    .map(|g| g * sigmoid_gradient(b.val - a.val))
+                    .collect(),
+            },
+            val: value,
+        }
     }
 
     fn eval_not(a: SoftBool) -> SoftBool {
@@ -252,11 +281,25 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     }
 
     fn eval_and(a: SoftBool, b: SoftBool) -> SoftBool {
-        todo!()
+        let new_val = a.val * b.val;
+        let new_gradient = (a.gradient * b.val) + (b.gradient * a.val); //product rule
+
+        SoftBool {
+            val: new_val,
+            gradient: new_gradient,
+        }
     }
 
     fn eval_or(a: SoftBool, b: SoftBool) -> SoftBool {
-        todo!()
+        let anded = Self::eval_and(a.clone(), b.clone());
+
+        let new_val = a.val + b.val - anded.val;
+        let new_gradient = a.gradient + b.gradient - anded.gradient;
+
+        SoftBool {
+            val: new_val,
+            gradient: new_gradient,
+        }
     }
 
     fn eval_if(
@@ -264,10 +307,57 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
         true_branch: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
         false_branch: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
     ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
-        todo!()
+        match (true_branch, false_branch) {
+            (ast::eval::EvalVal::Int(a), ast::eval::EvalVal::Int(b)) => {
+                ast::eval::EvalVal::Int(Self::eval_addition_ints(
+                    Self::eval_multiplication_int(
+                        a,
+                        SoftInt {
+                            val: cond.val,
+                            gradient: cond.gradient.clone(),
+                        },
+                    ),
+                    Self::eval_multiplication_int(
+                        b,
+                        SoftInt {
+                            val: (1.0 - cond.val),
+                            gradient: cond.gradient * -1.0,
+                        },
+                    ),
+                ))
+            }
+            (ast::eval::EvalVal::Float(a), ast::eval::EvalVal::Float(b)) => {
+                ast::eval::EvalVal::Float(Self::eval_addition_floats(
+                    Self::eval_multiplication_floats(
+                        a,
+                        SoftFloat {
+                            val: cond.val,
+                            gradient: cond.gradient.clone(),
+                        },
+                    ),
+                    Self::eval_multiplication_floats(
+                        b,
+                        SoftFloat {
+                            val: (1.0 - cond.val),
+                            gradient: cond.gradient * -1.0,
+                        },
+                    ),
+                ))
+            }
+            (ast::eval::EvalVal::Bool(a), ast::eval::EvalVal::Bool(b)) => {
+                let true_weighted = Self::eval_and(a, cond.clone());
+                let false_weighted = Self::eval_and(b, Self::eval_not(cond));
+
+                ast::eval::EvalVal::Bool(SoftBool {
+                    val: true_weighted.val + false_weighted.val,
+                    gradient: true_weighted.gradient + false_weighted.gradient,
+                })
+            }
+            _ => todo!(),
+        }
     }
 
-    fn make_range(start: SoftInt, end: SoftInt) -> Vec<SoftInt> {
+    fn make_range(_start: SoftInt, _end: SoftInt) -> Vec<SoftInt> {
         todo!()
     }
 }

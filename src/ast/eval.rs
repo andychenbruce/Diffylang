@@ -55,9 +55,6 @@ pub fn run_function<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType:
 where
     E: Evaluator<IntType, FloatType, BoolType, HardType>,
 {
-    let _type_env: crate::type_checker::TypeEnv =
-        crate::type_checker::type_check_program(program).unwrap();
-
     apply_function::<IntType, FloatType, BoolType, HardType, E>(
         Env {
             program,
@@ -88,7 +85,7 @@ impl<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone>
     }
 }
 
-pub fn eval<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+fn eval<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
     env: Env<IntType, FloatType, BoolType, HardType>,
     expr: &super::Expression<IntType, FloatType, BoolType, HardType>,
 ) -> EvalVal<IntType, FloatType, BoolType, HardType>
@@ -136,9 +133,7 @@ where
                     },
                     (EvalVal::Bool(a), EvalVal::Bool(b)) => match func_name.0.as_str() {
                         "__and" => EvalVal::Bool(E::eval_and(a, b)),
-                        "__or" => {
-                            EvalVal::Bool(E::eval_or(a, b))
-                        }
+                        "__or" => EvalVal::Bool(E::eval_or(a, b)),
                         _ => todo!(),
                     },
                     _ => todo!(),
@@ -201,21 +196,18 @@ where
         } => {
             let iter = match **fold_iter {
                 super::FoldIter::Range(ref start, ref end) => {
-                    let start = match eval::<IntType, FloatType, BoolType, HardType, E>(
-                        env.clone(),
-                        &start,
-                    ) {
-                        EvalVal::Int(x) => x,
-                        _ => unreachable!(),
-                    };
+                    let start =
+                        match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), start)
+                        {
+                            EvalVal::Int(x) => x,
+                            _ => unreachable!(),
+                        };
 
-                    let end = match eval::<IntType, FloatType, BoolType, HardType, E>(
-                        env.clone(),
-                        &end,
-                    ) {
-                        EvalVal::Int(x) => x,
-                        _ => unreachable!(),
-                    };
+                    let end =
+                        match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), end) {
+                            EvalVal::Int(x) => x,
+                            _ => unreachable!(),
+                        };
 
                     E::make_range(start, end)
                         .into_iter()
@@ -223,7 +215,7 @@ where
                         .collect()
                 }
                 super::FoldIter::ExprList(ref list) => {
-                    match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &list) {
+                    match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), list) {
                         EvalVal::List(l) => l,
                         _ => unreachable!(),
                     }
@@ -250,7 +242,7 @@ where
             values,
         } => EvalVal::List(
             values
-                .into_iter()
+                .iter()
                 .map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x))
                 .collect(),
         ),

@@ -56,15 +56,18 @@ fn harden_expr(
             args: args.into_iter().map(harden_expr).collect(),
             span,
         },
-        crate::ast::Expression::ExprWhere { bindings, inner } => crate::ast::Expression::ExprWhere{
-            bindings: bindings.into_iter().map(|binding| {
-                crate::ast::LetBind{
-                    ident: binding.ident,
-                    value: harden_expr(binding.value)
-                }
-            }).collect(),
-            inner: Box::new(harden_expr(*inner))
-        },
+        crate::ast::Expression::ExprWhere { bindings, inner } => {
+            crate::ast::Expression::ExprWhere {
+                bindings: bindings
+                    .into_iter()
+                    .map(|binding| crate::ast::LetBind {
+                        ident: binding.ident,
+                        value: harden_expr(binding.value),
+                    })
+                    .collect(),
+                inner: Box::new(harden_expr(*inner)),
+            }
+        }
         crate::ast::Expression::IfThenElse {
             boolean,
             true_expr,

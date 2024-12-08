@@ -151,7 +151,7 @@ fn make_hard(x: i64) -> i64 {
     x
 }
 
-pub fn make_program_inner<IntType, FloatType, BoolType, HardType>(
+fn make_program_inner<IntType, FloatType, BoolType, HardType>(
     parse_tree: crate::parser::ProgramParseTree,
     funcs: ProgramInitFunctions<IntType, FloatType, BoolType, HardType>,
     mut state: AstConversionState,
@@ -174,7 +174,7 @@ pub fn make_program_inner<IntType, FloatType, BoolType, HardType>(
             crate::parser::Declaration::TestCaseDef(t) => Some(make_expression(
                 &mut AstConversionState {
                     next_lit_id: LitId(None),
-                    total: state.total
+                    total: state.total,
                 },
                 &funcs,
                 t.inner.clone().into_inner(),
@@ -400,8 +400,8 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 crate::parser::FoldIter::Range(x) => {
                     let range = x.into_inner();
                     FoldIter::Range(
-                        make_expression(state, funcs, *range.start),
-                        make_expression(state, funcs, *range.end),
+                        make_expression_range(state, funcs, *range.start),
+                        make_expression_range(state, funcs, *range.end),
                     )
                 }
                 crate::parser::FoldIter::ListExpr(expr) => {
@@ -428,5 +428,18 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                     .collect(),
             }
         }
+    }
+}
+
+fn make_expression_range<IntType, FloatType, BoolType, HardType>(
+    _state: &mut AstConversionState,
+    funcs: &ProgramInitFunctions<IntType, FloatType, BoolType, HardType>,
+    value: crate::parser::Expression,
+) -> Expression<IntType, FloatType, BoolType, HardType> {
+    match value {
+        crate::parser::Expression::IntegerLit(x) => {
+            Expression::HardInt((funcs.make_hard)(x.into_inner()))
+        }
+        _ => todo!(),
     }
 }
