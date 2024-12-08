@@ -37,6 +37,8 @@ pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
     fn eval_less_than_ints(a: IntType, b: IntType) -> BoolType;
     fn eval_less_than_floats(a: FloatType, b: FloatType) -> BoolType;
     fn eval_not(a: BoolType) -> BoolType;
+    fn eval_and(a: BoolType, b: BoolType) -> BoolType;
+    fn eval_or(a: BoolType, b: BoolType) -> BoolType;
     fn eval_if(
         cond: BoolType,
         true_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
@@ -122,12 +124,21 @@ where
                     },
                     (EvalVal::Float(a), EvalVal::Float(b)) => match func_name.0.as_str() {
                         "__add" => EvalVal::Float(E::eval_addition_floats(a, b)),
-                        "__sub" => EvalVal::Float(E::eval_addition_floats(a, E::eval_negation_float(b))),
+                        "__sub" => {
+                            EvalVal::Float(E::eval_addition_floats(a, E::eval_negation_float(b)))
+                        }
                         "__mul" => EvalVal::Float(E::eval_multiplication_floats(a, b)),
                         "__div" => todo!(),
                         "__eq" => EvalVal::Bool(E::eval_equality_floats(a, b)),
                         "__lt" => EvalVal::Bool(E::eval_less_than_floats(a, b)),
                         "__gt" => EvalVal::Bool(E::eval_less_than_floats(b, a)),
+                        _ => todo!(),
+                    },
+                    (EvalVal::Bool(a), EvalVal::Bool(b)) => match func_name.0.as_str() {
+                        "__and" => EvalVal::Bool(E::eval_and(a, b)),
+                        "__or" => {
+                            EvalVal::Bool(E::eval_or(a, b))
+                        }
                         _ => todo!(),
                     },
                     _ => todo!(),

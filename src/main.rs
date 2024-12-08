@@ -60,7 +60,11 @@ fn main() {
             })
             .collect();
 
-        let soft_val = interpreter_soft::soft_run_function(&soft_program_ast, func_name, soft_args);
+        let soft_val = ast::eval::run_function::<_, _, _, _, interpreter_soft::SoftEvaluator>(
+            &soft_program_ast,
+            func_name,
+            soft_args,
+        );
 
         eprintln!("soft val = {:?}", soft_val);
     } else {
@@ -70,13 +74,21 @@ fn main() {
         );
 
         for _ in 0..10 {
-            let soft_cases = interpreter_soft::soft_eval_test_cases(&soft_program_ast);
+            let soft_cases =
+                ast::eval::eval_test_cases::<_, _, _, _, interpreter_soft::SoftEvaluator>(
+                    &soft_program_ast,
+                );
 
             eprintln!("soft test cases = {:?}", soft_cases);
 
             let average_grad = soft_cases.into_iter().fold(
                 interpreter_soft::make_oneshot(soft_program_ast.num_ids, crate::ast::LitId(None)),
-                |acc, new| acc + new.1,
+                |acc, new| {
+                    acc + match new {
+                        ast::eval::EvalVal::Bool(x) => x.gradient,
+                        _ => unreachable!(),
+                    }
+                },
             );
 
             interpreter_soft::apply_gradient_program(&mut soft_program_ast, &average_grad);

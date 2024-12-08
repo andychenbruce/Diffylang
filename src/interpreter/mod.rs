@@ -60,6 +60,13 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     fn eval_not(a: bool) -> bool {
         !a
     }
+    fn eval_and(a: bool, b: bool) -> bool {
+        a && b
+    }
+
+    fn eval_or(a: bool, b: bool) -> bool {
+        a || b
+    }
     fn eval_less_than_ints(a: i64, b: i64) -> bool {
         a < b
     }
@@ -82,4 +89,5 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     fn make_range(start: i64, end: i64) -> Vec<i64> {
         (start..end).collect()
     }
+
 }
