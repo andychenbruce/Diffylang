@@ -94,9 +94,11 @@ fn main() {
             interpreter_soft::apply_gradient_program(&mut soft_program_ast, &average_grad);
         }
 
+        let hardened_ast = ast_hardening::harden_ast(soft_program_ast);
+        
         eprintln!(
             "test cases fixed maybe = {:?}",
-            ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hard_program_ast)
+            ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hardened_ast)
         );
     }
 }

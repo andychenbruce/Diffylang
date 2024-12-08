@@ -430,6 +430,3 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
         }
     }
 }
-
-
-
