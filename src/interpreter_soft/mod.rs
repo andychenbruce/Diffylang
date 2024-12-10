@@ -1,8 +1,8 @@
 use crate::ast;
 
 const SIGMOID_VARIANCE: f64 = 1.0;
-const EQUALITY_VARIANCE: f64 = 1000.0;
-
+const EQUALITY_VARIANCE: f64 = 5000.0;
+const SIGMA_LIST: f64 = 1.0;
 pub type SoftValue = ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>;
 
 pub const SOFT_AST_INIT: ast::ProgramInitFunctions<SoftInt, SoftFloat, SoftBool, i64> =
@@ -156,7 +156,61 @@ fn apply_gradient_expr(
 
             apply_gradient_expr(inner, grad);
         }
-        _ => {}
+        ast::Expression::Product(vals) => {
+            for val in vals {
+                apply_gradient_expr(val, grad);
+            }
+        }
+        ast::Expression::ProductProject { value, index: _ } => {
+            apply_gradient_expr(value, grad);
+        }
+        ast::Expression::List {
+            type_name: _,
+            values,
+        } => {
+            for val in values {
+                apply_gradient_expr(val, grad);
+            }
+        }
+        ast::Expression::IfThenElse {
+            boolean,
+            true_expr,
+            false_expr,
+        } => {
+            apply_gradient_expr(boolean, grad);
+            apply_gradient_expr(true_expr, grad);
+            apply_gradient_expr(false_expr, grad);
+        }
+        ast::Expression::FoldLoop {
+            fold_iter,
+            accumulator,
+            body,
+        } => {
+            match fold_iter.as_mut() {
+                ast::FoldIter::ExprList(ref mut l) => {
+                    apply_gradient_expr(l, grad);
+                }
+                ast::FoldIter::Range(ref mut start, ref mut end) => {
+                    apply_gradient_expr(start, grad);
+                    apply_gradient_expr(end, grad);
+                }
+            }
+            apply_gradient_expr(accumulator.1.as_mut(), grad);
+            apply_gradient_expr(body, grad);
+        }
+        ast::Expression::WhileLoop {
+            accumulator,
+            cond,
+            body,
+            exit_body,
+        } => {
+            apply_gradient_expr(accumulator.1.as_mut(), grad);
+            apply_gradient_expr(cond.as_mut(), grad);
+            apply_gradient_expr(body.as_mut(), grad);
+            apply_gradient_expr(exit_body.as_mut(), grad);
+        }
+        ast::Expression::Variable { ident: _, span: _ } => {}
+        ast::Expression::HardInt(_) => {}
     }
 }
 
@@ -371,8 +425,6 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
         l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
         i: SoftInt,
     ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
-        const SIGMA: f64 = 1.0;
-        println!("i = {:?}", i);
         let stuff = l
             .iter()
             .enumerate()
@@ -382,24 +434,24 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
                 let bottom_cdf = if p == 0 {
                     0.0
                 } else {
-                    rgsl::randist::gaussian::gaussian_P(bott_val, SIGMA)
+                    rgsl::randist::gaussian::gaussian_P(bott_val, SIGMA_LIST)
                 };
                 let top_cdf = if p == (l.len() - 1) {
                     1.0
                 } else {
-                    rgsl::randist::gaussian::gaussian_P(top_val, SIGMA)
+                    rgsl::randist::gaussian::gaussian_P(top_val, SIGMA_LIST)
                 };
 
                 let cdf = top_cdf - bottom_cdf;
                 let bottom_pdf = if p == 0 {
                     0.0
                 } else {
-                    rgsl::randist::gaussian::gaussian_pdf(bott_val, SIGMA)
+                    rgsl::randist::gaussian::gaussian_pdf(bott_val, SIGMA_LIST)
                 };
                 let top_pdf = if p == (l.len() - 1) {
                     0.0
                 } else {
-                    rgsl::randist::gaussian::gaussian_pdf(top_val, SIGMA)
+                    rgsl::randist::gaussian::gaussian_pdf(top_val, SIGMA_LIST)
                 };
 
                 let index_grad = i.gradient.clone() * -1.0 * (top_pdf - bottom_pdf);
@@ -453,12 +505,20 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
         }
     }
 
+    fn eval_set_index(
+        _l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
+        _i: SoftInt,
+        _v: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
+    ) -> Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>> {
+        todo!()
+    }
+
     fn eval_len(l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>) -> i64 {
         l.len() as i64
     }
 
     fn stop_while_eval(cond: SoftBool) -> bool {
-        cond.val < 0.001
+        cond.val < 0.5
     }
 
     fn eval_product_index(
@@ -467,6 +527,4 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
         p[i as usize].clone()
     }
-
-    
 }

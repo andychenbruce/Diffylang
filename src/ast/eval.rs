@@ -44,6 +44,11 @@ pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
         l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
         i: IntType,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
+    fn eval_set_index(
+        l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
+        i: IntType,
+        v: EvalVal<IntType, FloatType, BoolType, HardType>,
+    ) -> Vec<EvalVal<IntType, FloatType, BoolType, HardType>>;
     fn eval_len(l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>) -> HardType;
     fn eval_if(
         cond: BoolType,
@@ -166,6 +171,13 @@ where
                     (x, y) => todo!("THING = {}({:?}, {:?})", func_name.0.as_str(), x, y),
                 }
             }
+            "__neg" => {
+                match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]) {
+                    EvalVal::Int(x) => EvalVal::Int(E::eval_negation_int(x)),
+                    EvalVal::Float(x) => EvalVal::Float(E::eval_negation_float(x)),
+                    _ => todo!(),
+                }
+            }
             "__not" => {
                 match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]) {
                     EvalVal::Bool(x) => EvalVal::Bool(E::eval_not(x)),
@@ -179,6 +191,18 @@ where
                     eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[1]),
                 ) {
                     (EvalVal::List(l), EvalVal::Int(i)) => E::eval_index(l, i),
+                    _ => todo!(),
+                }
+            }
+            "__set_index" => {
+                match (
+                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[1]),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[2]),
+                ) {
+                    (EvalVal::List(l), EvalVal::Int(i), v) => {
+                        EvalVal::List(E::eval_set_index(l, i, v))
+                    }
                     _ => todo!(),
                 }
             }

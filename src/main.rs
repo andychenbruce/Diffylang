@@ -72,13 +72,13 @@ fn main() {
             ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hard_program_ast)
         );
 
-        for _ in 0..3000 {
+        for _ in 0..30 {
             let soft_cases =
                 ast::eval::eval_test_cases::<_, _, _, _, interpreter_soft::SoftEvaluator>(
                     &soft_program_ast,
                 );
 
-            // eprintln!("soft test cases = {:?}", soft_cases);
+            eprintln!("soft test cases = {:?}", soft_cases);
 
             let average_grad = soft_cases.into_iter().fold(
                 interpreter_soft::make_oneshot(soft_program_ast.num_ids, crate::ast::LitId(None)),
@@ -90,10 +90,14 @@ fn main() {
                 },
             );
 
+            // println!("average grad = {:?}", average_grad);
+            
             interpreter_soft::apply_gradient_program(&mut soft_program_ast, &(average_grad * 1.0));
         }
 
+        println!("final soft ast = {}", serde_json::to_string_pretty(&soft_program_ast).unwrap());
         let hardened_ast = ast_hardening::harden_ast(soft_program_ast.clone());
+        
 
         eprintln!(
             "test cases fixed maybe = {:?}",

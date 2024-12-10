@@ -94,7 +94,6 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
         l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
         i: i64,
     ) -> ast::eval::EvalVal<i64, f64, bool, i64> {
-        println!("BRUH");
         if i < 0 {
             l[0].clone()
         } else if i as usize >= l.len() - 1 {
@@ -102,6 +101,22 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
         } else {
             l[i as usize].clone()
         }
+    }
+
+    fn eval_set_index(
+        mut l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
+        i: i64,
+        v: ast::eval::EvalVal<i64, f64, bool, i64>,
+    ) -> Vec<ast::eval::EvalVal<i64, f64, bool, i64>> {
+        if i < 0 {
+            l[0] = v;
+        } else if i as usize >= l.len() - 1 {
+            *l.last_mut().unwrap() = v;
+        } else {
+            l[i as usize] = v
+        }
+
+        l
     }
 
     fn eval_len(l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>) -> i64 {
@@ -116,9 +131,6 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
         p: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
         i: i64,
     ) -> ast::eval::EvalVal<i64, f64, bool, i64> {
-            p[i as usize].clone()
+        p[i as usize].clone()
     }
-
-    
-    
 }

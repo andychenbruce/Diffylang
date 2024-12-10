@@ -1,3 +1,9 @@
 [exp2((x : int)) -> int
-  (while (acc, (0, 1)) (0 . acc < x) ((0 . acc + 1), (1 . acc * 2)) 1 . acc)
+  (while (acc, (0, 1)) __not((0 . acc == x)) ((0 . acc + 1), (1 . acc * 2)) 1 . acc)
 ];
+
+
+{(exp2(2) == 4)};
+{(exp2(3) == 8)};
+{(exp2(4) == 16)};
+{(exp2(5) == 32)};
