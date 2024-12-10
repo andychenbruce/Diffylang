@@ -95,5 +95,16 @@ fn harden_expr(
             accumulator: (accumulator.0, Box::new(harden_expr(*accumulator.1))),
             body: Box::new(harden_expr(*body)),
         },
+        crate::ast::Expression::WhileLoop {
+            accumulator,
+            cond,
+            body,
+            exit_body,
+        } => crate::ast::Expression::WhileLoop {
+            accumulator: (accumulator.0, Box::new(harden_expr(*accumulator.1))),
+            cond: Box::new(harden_expr(*cond)),
+            body: Box::new(harden_expr(*body)),
+            exit_body: Box::new(harden_expr(*exit_body)),
+        },
     }
 }

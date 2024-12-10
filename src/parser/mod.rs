@@ -59,6 +59,16 @@ pub enum Expression {
         #[parsel(recursive)]
         body: Box<Expression>,
     },
+    WhileFoldLoop {
+        while_token: Token![while],
+        accumulator: parsel::ast::Paren<FoldAccumulator>,
+        #[parsel(recursive)]
+        cond: Box<Expression>,
+        #[parsel(recursive)]
+        body: Box<Expression>,
+        #[parsel(recursive)]
+        exit_body: Box<Expression>
+    },
 
     FunctionApplication {
         func_name: parsel::ast::Ident,

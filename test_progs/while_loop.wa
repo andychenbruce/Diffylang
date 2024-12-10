@@ -1,0 +1,3 @@
+[exp2((x : int)) -> int
+  (while (acc, 1) (acc < 100) (acc * x) acc)
+];

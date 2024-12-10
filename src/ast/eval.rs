@@ -49,10 +49,17 @@ pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
         true_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
         false_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
+    fn stop_while_eval(cond: BoolType) -> bool;
     fn make_range(start: HardType, end: HardType, num_ids: usize) -> Vec<IntType>;
 }
 
-pub fn run_function<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+pub fn run_function<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+    HardType: Clone + core::fmt::Debug,
+    E,
+>(
     program: &super::Program<IntType, FloatType, BoolType, HardType>,
     func_name: &str,
     arguments: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
@@ -70,8 +77,12 @@ where
     )
 }
 
-impl<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone>
-    EnvVars<IntType, FloatType, BoolType, HardType>
+impl<
+        IntType: Clone + core::fmt::Debug,
+        FloatType: Clone + core::fmt::Debug,
+        BoolType: Clone + core::fmt::Debug,
+        HardType: Clone + core::fmt::Debug,
+    > EnvVars<IntType, FloatType, BoolType, HardType>
 {
     fn lookup_var(
         &self,
@@ -90,7 +101,13 @@ impl<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone>
     }
 }
 
-fn eval<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+fn eval<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+    HardType: Clone + core::fmt::Debug,
+    E,
+>(
     env: Env<IntType, FloatType, BoolType, HardType>,
     expr: &super::Expression<IntType, FloatType, BoolType, HardType>,
 ) -> EvalVal<IntType, FloatType, BoolType, HardType>
@@ -258,6 +275,81 @@ where
                 },
             )
         }
+        super::Expression::WhileLoop {
+            accumulator,
+            cond,
+            body,
+            exit_body,
+        } => {
+            let mut acc =
+                eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &accumulator.1);
+
+            let mut exits = vec![];
+
+            loop {
+                let new_vars = EnvVars::Rest {
+                    first: (accumulator.0.clone(), acc.clone()),
+                    rest: Box::new(env.vars.clone()),
+                };
+                let new_env = Env {
+                    program: env.program,
+                    vars: new_vars,
+                };
+
+                let cond_val = {
+                    if let EvalVal::Bool(x) =
+                        eval::<IntType, FloatType, BoolType, HardType, E>(new_env.clone(), cond)
+                    {
+                        x
+                    } else {
+                        panic!()
+                    }
+                };
+
+                exits.push((cond_val.clone(), acc.clone()));
+                if E::stop_while_eval(cond_val) {
+                    break;
+                }
+                
+                acc = eval::<IntType, FloatType, BoolType, HardType, E>(new_env, body);
+
+
+                
+            }
+
+            let last_body = {
+                let new_vars = EnvVars::Rest {
+                    first: (accumulator.0.clone(), exits.last().unwrap().1.clone()),
+                    rest: Box::new(env.vars.clone()),
+                };
+                let new_env = Env {
+                    program: env.program,
+                    vars: new_vars,
+                };
+
+                eval::<IntType, FloatType, BoolType, HardType, E>(new_env, exit_body)
+            };
+
+            println!("exits = {:?}", exits);
+            exits[..exits.len() - 1].iter().fold(
+                last_body,
+                |acc: EvalVal<_, _, _, _>, (cond, val)| {
+                    let new_vars = EnvVars::Rest {
+                        first: (accumulator.0.clone(), val.clone()),
+                        rest: Box::new(env.vars.clone()),
+                    };
+                    let new_env = Env {
+                        program: env.program,
+                        vars: new_vars,
+                    };
+
+                    let exit_val =
+                        eval::<IntType, FloatType, BoolType, HardType, E>(new_env, exit_body);
+
+                    E::eval_if(cond.clone(), acc, exit_val)
+                },
+            )
+        }
         super::Expression::List {
             type_name: _,
             values,
@@ -270,7 +362,13 @@ where
     }
 }
 
-fn apply_function<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+fn apply_function<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+    HardType: Clone + core::fmt::Debug,
+    E,
+>(
     env: Env<IntType, FloatType, BoolType, HardType>,
     func_name: &str,
     arguments: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
@@ -300,7 +398,13 @@ where
     )
 }
 
-pub fn eval_test_cases<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
+pub fn eval_test_cases<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+    HardType: Clone + core::fmt::Debug,
+    E,
+>(
     program: &super::Program<IntType, FloatType, BoolType, HardType>,
 ) -> Vec<EvalVal<IntType, FloatType, BoolType, HardType>>
 where

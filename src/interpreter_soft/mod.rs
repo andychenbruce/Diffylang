@@ -456,4 +456,8 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     fn eval_len(l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>) -> i64 {
         l.len() as i64
     }
+
+    fn stop_while_eval(cond: SoftBool) -> bool {
+        cond.val < 0.001
+    }
 }

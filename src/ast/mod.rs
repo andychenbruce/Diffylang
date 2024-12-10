@@ -92,6 +92,15 @@ pub enum Expression<IntType, FloatType, BoolType, HardType> {
         ),
         body: Box<Expression<IntType, FloatType, BoolType, HardType>>,
     },
+    WhileLoop {
+        accumulator: (
+            Identifier,
+            Box<Expression<IntType, FloatType, BoolType, HardType>>,
+        ),
+        cond: Box<Expression<IntType, FloatType, BoolType, HardType>>,
+        body: Box<Expression<IntType, FloatType, BoolType, HardType>>,
+        exit_body: Box<Expression<IntType, FloatType, BoolType, HardType>>,
+    },
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -418,6 +427,24 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 fold_iter: Box::new(fold_iter),
             }
         }
+        crate::parser::Expression::WhileFoldLoop {
+            while_token: _,
+            accumulator,
+            cond,
+            body,
+            exit_body,
+        } => {
+            let acc_inner = accumulator.into_inner();
+            Expression::WhileLoop {
+                accumulator: (
+                    Identifier(acc_inner.name.to_string()),
+                    Box::new(make_expression(state, funcs, *acc_inner.initial_expression)),
+                ),
+                cond: Box::new(make_expression(state, funcs, *cond)),
+                body: Box::new(make_expression(state, funcs, *body)),
+                exit_body: Box::new(make_expression(state, funcs, *exit_body)),
+            }
+        }
         crate::parser::Expression::ListLit(list_inner) => {
             let list_inner = list_inner.into_inner();
             Expression::List {
@@ -447,7 +474,7 @@ fn make_expression_range<IntType, FloatType, BoolType, HardType>(
             args: _,
         } => match func_name.to_string().as_str() {
             "__len" => make_expression(state, funcs, value),
-            _ => unreachable!()
+            _ => unreachable!(),
         },
         crate::parser::Expression::ListLit(_) => todo!(),
         _ => panic!("ranges must be only integers or length of lists"),

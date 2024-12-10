@@ -107,4 +107,9 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     fn eval_len(l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>) -> i64 {
         l.len() as i64
     }
+
+    fn stop_while_eval(cond: bool) -> bool {
+        !cond
+    }
+    
 }
