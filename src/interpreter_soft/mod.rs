@@ -361,8 +361,10 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
         }
     }
 
-    fn make_range(_start: SoftInt, _end: SoftInt) -> Vec<SoftInt> {
-        todo!()
+    fn make_range(start: i64, end: i64, num_ids: usize) -> Vec<SoftInt> {
+        (start..end)
+            .map(|x| make_int(x, ast::LitId(None), num_ids))
+            .collect()
     }
 
     fn eval_index(

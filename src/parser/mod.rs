@@ -72,6 +72,9 @@ pub enum Expression {
     FloatLit(parsel::ast::LitFloat),
     BoolLit(parsel::ast::LitBool),
 
+    #[parsel(recursive)]
+    Product(ProductType),
+    
     Addition(parsel::ast::Paren<BinaryOp<Token![+]>>),
     Subtraction(parsel::ast::Paren<BinaryOp<Token![-]>>),
     Multiplication(parsel::ast::Paren<BinaryOp<Token![*]>>),
@@ -161,4 +164,10 @@ pub struct ListInner {
     pub semicolon: Token![;],
     #[parsel(recursive)]
     pub values: parsel::ast::Punctuated<Box<Expression>, Token![,]>,
+}
+
+#[derive(Clone, Debug, Parse, ToTokens)]
+pub struct ProductType {
+    #[parsel(recursive)]
+    pub values: parsel::ast::Paren<parsel::ast::Punctuated<Box<Expression>, Token![,]>>
 }

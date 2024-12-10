@@ -72,7 +72,7 @@ fn main() {
             ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hard_program_ast)
         );
 
-        for _ in 0..300 {
+        for _ in 0..3000 {
             let soft_cases =
                 ast::eval::eval_test_cases::<_, _, _, _, interpreter_soft::SoftEvaluator>(
                     &soft_program_ast,
@@ -90,7 +90,7 @@ fn main() {
                 },
             );
 
-            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &(average_grad * 10.0));
+            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &(average_grad * 1.0));
         }
 
         let hardened_ast = ast_hardening::harden_ast(soft_program_ast.clone());

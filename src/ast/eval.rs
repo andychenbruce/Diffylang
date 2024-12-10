@@ -49,7 +49,7 @@ pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
         true_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
         false_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
-    fn make_range(start: IntType, end: IntType) -> Vec<IntType>;
+    fn make_range(start: HardType, end: HardType, num_ids: usize) -> Vec<IntType>;
 }
 
 pub fn run_function<IntType: Clone, FloatType: Clone, BoolType: Clone, HardType: Clone, E>(
@@ -220,17 +220,17 @@ where
                     let start =
                         match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), start)
                         {
-                            EvalVal::Int(x) => x,
+                            EvalVal::Hard(x) => x,
                             _ => unreachable!(),
                         };
 
                     let end =
                         match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), end) {
-                            EvalVal::Int(x) => x,
+                            EvalVal::Hard(x) => x,
                             _ => unreachable!(),
                         };
 
-                    E::make_range(start, end)
+                    E::make_range(start, end, env.program.num_ids)
                         .into_iter()
                         .map(|x| EvalVal::Int(x))
                         .collect()

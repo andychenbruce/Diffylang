@@ -429,11 +429,12 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                     .collect(),
             }
         }
+        crate::parser::Expression::Product(_) => todo!(),
     }
 }
 
 fn make_expression_range<IntType, FloatType, BoolType, HardType>(
-    _state: &mut AstConversionState,
+    state: &mut AstConversionState,
     funcs: &ProgramInitFunctions<IntType, FloatType, BoolType, HardType>,
     value: crate::parser::Expression,
 ) -> Expression<IntType, FloatType, BoolType, HardType> {
@@ -441,6 +442,14 @@ fn make_expression_range<IntType, FloatType, BoolType, HardType>(
         crate::parser::Expression::IntegerLit(x) => {
             Expression::HardInt((funcs.make_hard)(x.into_inner()))
         }
-        _ => todo!(),
+        crate::parser::Expression::FunctionApplication {
+            ref func_name,
+            args: _,
+        } => match func_name.to_string().as_str() {
+            "__len" => make_expression(state, funcs, value),
+            _ => unreachable!()
+        },
+        crate::parser::Expression::ListLit(_) => todo!(),
+        _ => panic!("ranges must be only integers or length of lists"),
     }
 }

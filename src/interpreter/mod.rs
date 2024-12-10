@@ -86,7 +86,7 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
         }
     }
 
-    fn make_range(start: i64, end: i64) -> Vec<i64> {
+    fn make_range(start: i64, end: i64, _num_ids: usize) -> Vec<i64> {
         (start..end).collect()
     }
 
