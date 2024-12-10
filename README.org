@@ -1,5 +1,5 @@
-* WangAnLang
-A language for approximating imperative programs as a neural nets.
+* DiffyLang
+A research language for approximating functional programs as a neural nets.
 
 * todo
 ** DONE Language parser
@@ -9,10 +9,19 @@ A language for approximating imperative programs as a neural nets.
 ** DONE soft evaluation
 ** DONE calculate gradients
 ** DONE gradient descent
-** TODO loss functions
+** DONE loss functions
 ** TODO switch from cpu to gpu tensors
 
-** arithmetic
+* Build Instructions
+#+BEGIN_SRC shell
+  cargo run -- FILENAME [FUNC NAME] [ARGS ...]
+#+END_SRC
+
+** Dependencies
+- *Cargo*: Dependencies are managed by Cargo.
+- *LaTeX*: Required for compiling the proposal document.
+
+** Basic arithmetic
 - [X] addition
   - [X] hard
   - [X] soft
@@ -21,46 +30,46 @@ A language for approximating imperative programs as a neural nets.
   - [X] hard
   - [X] soft
   - [X] gradient
-- [-] multiplcation
-  - [ ] hard
+- [X] multiplcation
+  - [X] hard
   - [X] soft
   - [X] gradient
 - [ ] division
   - [ ] hard
   - [ ] soft
   - [ ] gradient
-- [ ] equality
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+- [X] equality
+  - [X] hard
+  - [X] soft
+  - [X] gradient
 - [X] greater than
   - [X] hard
   - [X] soft
   - [X] gradient
-- [ ] less than
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+- [X] less than
+  - [X] hard
+  - [X] soft
+  - [X] gradient
 
 ** boolean logic
-- [ ] and
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
-- [ ] or
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+- [X] and
+  - [X] hard
+  - [X] soft
+  - [X] gradient
+- [X] or
+  - [X] hard
+  - [X] soft
+  - [X] gradient
 - [X] not
   - [X] hard
   - [X] soft
   - [X] gradient
 
 ** lists
-- [ ] getting
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+- [X] getting
+  - [X] hard
+  - [X] soft
+  - [X] gradient
 - [ ] setting
   - [ ] hard
   - [ ] soft
@@ -75,17 +84,17 @@ A language for approximating imperative programs as a neural nets.
   - [X] hard
   - [X] soft
   - [X] gradient
-- [-] for loops
+- [X] for loops
   - only fixed length loops
   - [X] hard
   - [X] soft
   - [X] gradient
-  - [ ] be able to access index
-- [ ] while loops
+  - [X] be able to access index
+- [X] while loops
   - represent with a markov chain
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+  - [X] hard
+  - [X] soft
+  - [X] gradient
 
 ** dictionaries
 - [ ] getting
@@ -100,54 +109,3 @@ A language for approximating imperative programs as a neural nets.
   - [ ] hard
   - [ ] soft
   - [ ] gradient
-
-
-* Project Structure
-
-The project is organized as follows:
-
-#+BEGIN_SRC
-.
-├── proposal
-│   ├── build.sh                # Shell script for building the proposal
-│   ├── proposal.tex            # LaTeX source file for the proposal document
-│   └── refs.bib                # Bibliography file for LaTeX references
-├── src
-│   ├── ast                     # Directory for abstract syntax tree (AST) module
-│   │   └── mod.rs              # Rust module file for AST
-│   ├── interpreter             # Directory for interpreter module
-│   │   └── mod.rs              # Rust module file for interpreter
-│   ├── interpreter_soft        # Directory for "soft" interpreter module
-│   │   └── mod.rs              # Rust module file for soft interpreter
-│   ├── parser                  # Directory for parser module
-│   │   └── mod.rs              # Rust module file for parser
-│   ├── type_checker            # Directory for type checker module
-│   │   └── mod.rs              # Rust module file for type checker
-│   └── main.rs                 # Main Rust source file for src
-├── .gitignore                  # Git ignore file
-├── Cargo.lock                  # Cargo lock file for Rust dependencies
-├── Cargo.toml                  # Cargo configuration file for Rust dependencies
-├── README.org                  # Project README file
-└── test.prog                   # Test program file
-#+END_SRC
-
-** Description
-- *proposal/*: Contains files related to the proposal document, including LaTeX source, bibliography, and build script.
-- *src/*: Contains subdirectories for modules handling JSON generation, parsing, and type checking.
-- *Cargo.toml* and *Cargo.lock*: Cargo package manager files for dependencies.
-
-* Build Instructions
-
-1. To build the proposal, navigate to the `proposal` directory and run:
-#+BEGIN_SRC shell
-  ./build.sh
-#+END_SRC
-
-2. For the interpreter, use Cargo:
-#+BEGIN_SRC shell
-  cargo run
-#+END_SRC
-
-** Dependencies
-- *Cargo*: Dependencies are managed by Cargo.
-- *LaTeX*: Required for compiling the proposal document.
