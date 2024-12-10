@@ -460,4 +460,13 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     fn stop_while_eval(cond: SoftBool) -> bool {
         cond.val < 0.001
     }
+
+    fn eval_product_index(
+        p: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
+        i: i64,
+    ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
+        p[i as usize].clone()
+    }
+
+    
 }

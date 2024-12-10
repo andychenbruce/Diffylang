@@ -106,5 +106,14 @@ fn harden_expr(
             body: Box::new(harden_expr(*body)),
             exit_body: Box::new(harden_expr(*exit_body)),
         },
+        crate::ast::Expression::Product(values) => {
+            crate::ast::Expression::Product(values.into_iter().map(harden_expr).collect())
+        }
+        crate::ast::Expression::ProductProject { value, index } => {
+            crate::ast::Expression::ProductProject {
+                value: Box::new(harden_expr(*value)),
+                index,
+            }
+        }
     }
 }

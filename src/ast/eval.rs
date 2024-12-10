@@ -5,6 +5,7 @@ pub enum EvalVal<IntType, FloatType, BoolType, HardType> {
     Bool(BoolType),
     Hard(HardType),
     List(Vec<EvalVal<IntType, FloatType, BoolType, HardType>>),
+    Product(Vec<EvalVal<IntType, FloatType, BoolType, HardType>>),
 }
 
 #[derive(Clone)]
@@ -51,6 +52,10 @@ pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
     fn stop_while_eval(cond: BoolType) -> bool;
     fn make_range(start: HardType, end: HardType, num_ids: usize) -> Vec<IntType>;
+    fn eval_product_index(
+        p: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
+        i: HardType,
+    ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
 }
 
 pub fn run_function<
@@ -158,7 +163,7 @@ where
                         "__or" => EvalVal::Bool(E::eval_or(a, b)),
                         _ => todo!(),
                     },
-                    _ => todo!(),
+                    (x, y) => todo!("THING = {}({:?}, {:?})", func_name.0.as_str(), x, y),
                 }
             }
             "__not" => {
@@ -286,6 +291,7 @@ where
 
             let mut exits = vec![];
 
+            let mut iters = 0;
             loop {
                 let new_vars = EnvVars::Rest {
                     first: (accumulator.0.clone(), acc.clone()),
@@ -310,11 +316,13 @@ where
                 if E::stop_while_eval(cond_val) {
                     break;
                 }
-                
+                if iters > 500 {
+                    break;
+                }
+
                 acc = eval::<IntType, FloatType, BoolType, HardType, E>(new_env, body);
 
-
-                
+                iters += 1;
             }
 
             let last_body = {
@@ -330,7 +338,6 @@ where
                 eval::<IntType, FloatType, BoolType, HardType, E>(new_env, exit_body)
             };
 
-            println!("exits = {:?}", exits);
             exits[..exits.len() - 1].iter().fold(
                 last_body,
                 |acc: EvalVal<_, _, _, _>, (cond, val)| {
@@ -359,6 +366,18 @@ where
                 .map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x))
                 .collect(),
         ),
+        super::Expression::Product(value) => EvalVal::Product(
+            value
+                .iter()
+                .map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x))
+                .collect(),
+        ),
+        super::Expression::ProductProject { value, index } => {
+            match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), value) {
+                EvalVal::Product(vals) => E::eval_product_index(vals, index.clone()),
+                _ => unreachable!(),
+            }
+        }
     }
 }
 

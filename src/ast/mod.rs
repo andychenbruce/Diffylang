@@ -60,6 +60,12 @@ pub enum Expression<IntType, FloatType, BoolType, HardType> {
         #[serde(skip)]
         span: parsel::Span,
     },
+    Product(Vec<Expression<IntType, FloatType, BoolType, HardType>>),
+    ProductProject {
+        value: Box<Expression<IntType, FloatType, BoolType, HardType>>,
+        index: HardType,
+    },
+
     HardInt(HardType),
     Integer(IntType, LitId),
     Float(FloatType, LitId),
@@ -456,7 +462,20 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                     .collect(),
             }
         }
-        crate::parser::Expression::Product(_) => todo!(),
+        crate::parser::Expression::Product(x) => Expression::Product(
+            x.values
+                .into_inner()
+                .into_inner()
+                .into_iter()
+                .map(|x| make_expression(state, funcs, *x))
+                .collect(),
+        ),
+        crate::parser::Expression::ProductProject { index, dot: _, value  } => {
+            Expression::ProductProject{
+                value: Box::new(make_expression(state, funcs, *value)),
+                index: (funcs.make_hard)(index.into_inner()),
+            }
+        }
     }
 }
 

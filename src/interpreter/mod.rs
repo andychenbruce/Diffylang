@@ -111,5 +111,14 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     fn stop_while_eval(cond: bool) -> bool {
         !cond
     }
+
+    fn eval_product_index(
+        p: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
+        i: i64,
+    ) -> ast::eval::EvalVal<i64, f64, bool, i64> {
+            p[i as usize].clone()
+    }
+
+    
     
 }

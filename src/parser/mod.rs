@@ -50,6 +50,16 @@ pub struct VarType {
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub enum Expression {
+    #[parsel(recursive)]
+    Product(ProductType),
+    
+    ProductProject {
+        index: parsel::ast::LitInt,
+        dot: Token![.],
+        #[parsel(recursive)]
+        value: Box<Expression>,
+    },
+
     ListLit(parsel::ast::Brace<ListInner>),
     FoldLoop {
         fold_token: kw::fold,
@@ -67,7 +77,7 @@ pub enum Expression {
         #[parsel(recursive)]
         body: Box<Expression>,
         #[parsel(recursive)]
-        exit_body: Box<Expression>
+        exit_body: Box<Expression>,
     },
 
     FunctionApplication {
@@ -82,9 +92,6 @@ pub enum Expression {
     FloatLit(parsel::ast::LitFloat),
     BoolLit(parsel::ast::LitBool),
 
-    #[parsel(recursive)]
-    Product(ProductType),
-    
     Addition(parsel::ast::Paren<BinaryOp<Token![+]>>),
     Subtraction(parsel::ast::Paren<BinaryOp<Token![-]>>),
     Multiplication(parsel::ast::Paren<BinaryOp<Token![*]>>),
@@ -118,6 +125,9 @@ pub enum Expression {
         #[parsel(recursive)]
         false_expr: Box<Expression>,
     },
+    
+    
+    // },
     //     ListIndex{
     //     #[parsel(recursive)]
     //     list: Box<Expression>,
@@ -179,5 +189,5 @@ pub struct ListInner {
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub struct ProductType {
     #[parsel(recursive)]
-    pub values: parsel::ast::Paren<parsel::ast::Punctuated<Box<Expression>, Token![,]>>
+    pub values: parsel::ast::Paren<parsel::ast::Punctuated<Box<Expression>, Token![,]>>,
 }
