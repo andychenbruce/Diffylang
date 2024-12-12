@@ -1,5 +1,5 @@
 [pow3((x : int)) -> int
-  (fold (0, 3) (acc, 1) (acc * x))
+  (fold [0, 3] (acc, 1) (acc * x))
 ];
 
 

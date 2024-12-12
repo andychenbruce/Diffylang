@@ -1,0 +1,6 @@
+[bubble_sort_pass ((l : int)) -> bool
+  (fold [0, __len(l)] (acc, (l, 0))
+   (((let first = __index(0 . acc, 1 . acc)),
+     (let first = __index(0 . acc, (1 . acc + 1)))) in 0))
+];
+

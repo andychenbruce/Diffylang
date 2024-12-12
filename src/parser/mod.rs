@@ -146,7 +146,7 @@ pub struct FoldAccumulator {
 
 #[derive(Clone, Debug, Parse, ToTokens)]
 pub enum FoldIter {
-    Range(parsel::ast::Paren<FoldRange>),
+    Range(parsel::ast::Bracket<FoldRange>),
     #[parsel(recursive)]
     ListExpr(Box<Expression>),
 }
