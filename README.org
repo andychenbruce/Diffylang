@@ -1,6 +1,10 @@
 * DiffyLang
 A research language for approximating functional programs as a neural nets.
 
+* Dependencies
+- =cargo= and =rustc=
+- A linker
+
 * Build Instructions
 #+BEGIN_SRC shell
   cargo run -- FILENAME [FUNC NAME] [ARGS ...]
@@ -12,5 +16,3 @@ A research language for approximating functional programs as a neural nets.
 ** TODO division
 ** TODO dictionaries
 
-** Dependencies
-- =Cargo=: Dependencies are managed by Cargo.
