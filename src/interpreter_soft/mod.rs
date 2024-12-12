@@ -1,8 +1,8 @@
 use crate::ast;
 
 const SIGMOID_VARIANCE: f64 = 1.0;
-const EQUALITY_VARIANCE: f64 = 5000.0;
-const SIGMA_LIST: f64 = 1.0;
+const EQUALITY_VARIANCE: f64 = 20.0;
+const SIGMA_LIST: f64 = 0.5;
 pub type SoftValue = ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>;
 
 pub const SOFT_AST_INIT: ast::ProgramInitFunctions<SoftInt, SoftFloat, SoftBool, i64> =
@@ -272,6 +272,7 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     }
 
     fn eval_equality_ints(a: SoftInt, b: SoftInt) -> SoftBool {
+        println!("comparing {:?} and {:?}", a, b);
         let diff = a.val - b.val;
         let diff_grad = a.gradient - b.gradient;
         let val = (-(diff * diff) / EQUALITY_VARIANCE).exp();
@@ -506,11 +507,57 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     }
 
     fn eval_set_index(
-        _l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
-        _i: SoftInt,
-        _v: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
+        l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
+        i: SoftInt,
+        v: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
     ) -> Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>> {
-        todo!()
+        let stuff = (0..l.len())
+            .map(|p| {
+                let bott_val = (p as f64) - i.val - 0.5;
+                let top_val = (p as f64) - i.val + 0.5;
+                let bottom_cdf = if p == 0 {
+                    0.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_P(bott_val, SIGMA_LIST)
+                };
+                let top_cdf = if p == (l.len() - 1) {
+                    1.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_P(top_val, SIGMA_LIST)
+                };
+
+                let cdf = top_cdf - bottom_cdf;
+                let bottom_pdf = if p == 0 {
+                    0.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_pdf(bott_val, SIGMA_LIST)
+                };
+                let top_pdf = if p == (l.len() - 1) {
+                    0.0
+                } else {
+                    rgsl::randist::gaussian::gaussian_pdf(top_val, SIGMA_LIST)
+                };
+
+                let index_grad = i.gradient.clone() * -1.0 * (top_pdf - bottom_pdf);
+
+                (cdf, index_grad)
+            })
+            .collect::<Vec<_>>();
+
+        stuff
+            .into_iter()
+            .zip(l)
+            .map(|((percent, grad), l_v)| {
+                Self::eval_if(
+                    SoftBool {
+                        val: percent,
+                        gradient: grad,
+                    },
+                    v.clone(),
+                    l_v,
+                )
+            })
+            .collect()
     }
 
     fn eval_len(l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>) -> i64 {

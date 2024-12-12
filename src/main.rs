@@ -72,7 +72,7 @@ fn main() {
             ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hard_program_ast)
         );
 
-        for _ in 0..30 {
+        for _ in 0..900 {
             let soft_cases =
                 ast::eval::eval_test_cases::<_, _, _, _, interpreter_soft::SoftEvaluator>(
                     &soft_program_ast,
