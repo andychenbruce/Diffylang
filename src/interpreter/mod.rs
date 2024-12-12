@@ -115,7 +115,6 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
         } else {
             l[i as usize] = v
         }
-
         l
     }
 

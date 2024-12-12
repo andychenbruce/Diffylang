@@ -412,6 +412,26 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
                     gradient: true_weighted.gradient + false_weighted.gradient,
                 })
             }
+            (ast::eval::EvalVal::Product(a), ast::eval::EvalVal::Product(b)) => {
+                assert!(a.len() == b.len());
+
+                ast::eval::EvalVal::Product(
+                    a.into_iter()
+                        .zip(b)
+                        .map(|(a_val, b_val)| Self::eval_if(cond.clone(), a_val, b_val))
+                        .collect(),
+                )
+            }
+            (ast::eval::EvalVal::List(a), ast::eval::EvalVal::List(b)) => {
+                assert!(a.len() == b.len());
+
+                ast::eval::EvalVal::List(
+                    a.into_iter()
+                        .zip(b)
+                        .map(|(a_val, b_val)| Self::eval_if(cond.clone(), a_val, b_val))
+                        .collect(),
+                )
+            }
             _ => todo!(),
         }
     }
