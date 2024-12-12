@@ -28,6 +28,9 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     fn eval_addition_ints(a: i64, b: i64) -> i64 {
         a + b
     }
+    fn eval_addition_hards(a: i64, b: i64) -> i64 {
+        a + b
+    }
 
     fn eval_addition_floats(a: f64, b: f64) -> f64 {
         a + b
@@ -42,6 +45,9 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     }
 
     fn eval_negation_int(a: i64) -> i64 {
+        -a
+    }
+    fn eval_negation_hard(a: i64) -> i64 {
         -a
     }
 

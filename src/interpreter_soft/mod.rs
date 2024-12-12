@@ -227,6 +227,10 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
         }
     }
 
+    fn eval_addition_hards(a: i64, b: i64) -> i64 {
+        a + b
+    }
+
     fn eval_addition_floats(a: SoftFloat, b: SoftFloat) -> SoftFloat {
         let new_val = a.val + b.val;
         let new_gradient = a.gradient + b.gradient;
@@ -262,6 +266,10 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
             val: -1.0 * a.val,
             gradient: a.gradient * -1.0,
         }
+    }
+
+    fn eval_negation_hard(a: i64) -> i64 {
+        -a
     }
 
     fn eval_negation_float(a: SoftFloat) -> SoftFloat {

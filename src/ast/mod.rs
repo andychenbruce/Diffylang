@@ -193,6 +193,7 @@ fn make_program_inner<IntType, FloatType, BoolType, HardType>(
                 },
                 &funcs,
                 t.inner.clone().into_inner(),
+                true,
             )),
             crate::parser::Declaration::FunctionDef(_) => None,
         })
@@ -226,7 +227,12 @@ fn make_function_definition<IntType, FloatType, BoolType, HardType>(
                 )
             })
             .collect(),
-        body: make_expression(state, funcs, value.inner.func_body.clone().into_inner()),
+        body: make_expression(
+            state,
+            funcs,
+            value.inner.func_body.clone().into_inner(),
+            true,
+        ),
     }
 }
 
@@ -234,21 +240,33 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
     state: &mut AstConversionState,
     funcs: &ProgramInitFunctions<IntType, FloatType, BoolType, HardType>,
     value: crate::parser::Expression,
+    differentiable: bool,
 ) -> Expression<IntType, FloatType, BoolType, HardType> {
     let span = value.span();
     match value {
-        crate::parser::Expression::Variable(ref x) => Expression::Variable {
-            span,
-            ident: Identifier(x.to_string()),
-        },
+        crate::parser::Expression::Variable(ref x) => {
+            if !differentiable {
+                panic!()
+            }
+            Expression::Variable {
+                span,
+                ident: Identifier(x.to_string()),
+            }
+        }
         crate::parser::Expression::IntegerLit(x) => {
-            let output = Expression::Integer(
-                (funcs.make_int)(x.into_inner(), state.next_lit_id, state.total),
-                state.next_lit_id,
-            );
-            if let Some(x) = state.next_lit_id.0.as_mut() {
-                *x += 1
+            let output = if differentiable {
+                let out = Expression::Integer(
+                    (funcs.make_int)(x.into_inner(), state.next_lit_id, state.total),
+                    state.next_lit_id,
+                );
+                if let Some(x) = state.next_lit_id.0.as_mut() {
+                    *x += 1
+                };
+                out
+            } else {
+                Expression::HardInt((funcs.make_hard)(x.into_inner()))
             };
+
             output
         }
         crate::parser::Expression::StringLit(x) => {
@@ -281,72 +299,72 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
         crate::parser::Expression::Addition(ref x) => Expression::FuncApplication {
             func_name: Identifier("__add".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::Subtraction(ref x) => Expression::FuncApplication {
             func_name: Identifier("__sub".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::Multiplication(ref x) => Expression::FuncApplication {
             func_name: Identifier("__mul".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::Division(ref x) => Expression::FuncApplication {
             func_name: Identifier("__div".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::Equality(ref x) => Expression::FuncApplication {
             func_name: Identifier("__eq".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::GreaterThan(ref x) => Expression::FuncApplication {
             func_name: Identifier("__gt".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::LessThan(ref x) => Expression::FuncApplication {
             func_name: Identifier("__lt".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::And(ref x) => Expression::FuncApplication {
             func_name: Identifier("__and".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
         crate::parser::Expression::Or(ref x) => Expression::FuncApplication {
             func_name: Identifier("__or".to_owned()),
             args: vec![
-                make_expression(state, funcs, *x.left_side.clone()),
-                make_expression(state, funcs, *x.right_side.clone()),
+                make_expression(state, funcs, *x.left_side.clone(), differentiable),
+                make_expression(state, funcs, *x.right_side.clone(), differentiable),
             ],
             span,
         },
@@ -355,22 +373,32 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
             ref inner,
         } => Expression::FuncApplication {
             func_name: Identifier("__not".to_owned()),
-            args: vec![make_expression(state, funcs, *inner.clone())],
+            args: vec![make_expression(
+                state,
+                funcs,
+                *inner.clone(),
+                differentiable,
+            )],
             span,
         },
         crate::parser::Expression::FunctionApplication {
             ref func_name,
             ref args,
-        } => Expression::FuncApplication {
-            span,
-            func_name: Identifier(func_name.to_string()),
-            args: args
-                .clone()
-                .into_inner()
-                .into_iter()
-                .map(|x| make_expression(state, funcs, *x))
-                .collect(),
-        },
+        } => {
+            let func_name = func_name.to_string();
+            let can_diff = func_name == "__len" || differentiable;
+
+            Expression::FuncApplication {
+                span,
+                func_name: Identifier(func_name),
+                args: args
+                    .clone()
+                    .into_inner()
+                    .into_iter()
+                    .map(|x| make_expression(state, funcs, *x, can_diff))
+                    .collect(),
+            }
+        }
         crate::parser::Expression::ExprWhere {
             bindings,
             where_token: _,
@@ -383,13 +411,13 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 .map(|x| x.into_inner())
                 .map(|x| LetBind {
                     ident: Identifier(x.name.to_string()),
-                    value: make_expression(state, funcs, *x.value),
+                    value: make_expression(state, funcs, *x.value, differentiable),
                 })
                 .collect();
 
             Expression::ExprWhere {
                 bindings,
-                inner: Box::new(make_expression(state, funcs, *inner)),
+                inner: Box::new(make_expression(state, funcs, *inner, differentiable)),
             }
         }
         crate::parser::Expression::IfThenElse {
@@ -400,9 +428,9 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
             else_token: _,
             false_expr,
         } => Expression::IfThenElse {
-            boolean: Box::new(make_expression(state, funcs, *boolean)),
-            true_expr: Box::new(make_expression(state, funcs, *true_expr)),
-            false_expr: Box::new(make_expression(state, funcs, *false_expr)),
+            boolean: Box::new(make_expression(state, funcs, *boolean, differentiable)),
+            true_expr: Box::new(make_expression(state, funcs, *true_expr, differentiable)),
+            false_expr: Box::new(make_expression(state, funcs, *false_expr, differentiable)),
         },
         crate::parser::Expression::FoldLoop {
             fold_token: _,
@@ -416,20 +444,25 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 crate::parser::FoldIter::Range(x) => {
                     let range = x.into_inner();
                     FoldIter::Range(
-                        make_expression_range(state, funcs, *range.start),
-                        make_expression_range(state, funcs, *range.end),
+                        make_expression(state, funcs, *range.start, false),
+                        make_expression(state, funcs, *range.end, false),
                     )
                 }
                 crate::parser::FoldIter::ListExpr(expr) => {
-                    FoldIter::ExprList(make_expression(state, funcs, *expr))
+                    FoldIter::ExprList(make_expression(state, funcs, *expr, differentiable))
                 }
             };
             Expression::FoldLoop {
                 accumulator: (
                     Identifier(acc_inner.name.to_string()),
-                    Box::new(make_expression(state, funcs, *acc_inner.initial_expression)),
+                    Box::new(make_expression(
+                        state,
+                        funcs,
+                        *acc_inner.initial_expression,
+                        differentiable,
+                    )),
                 ),
-                body: Box::new(make_expression(state, funcs, *body)),
+                body: Box::new(make_expression(state, funcs, *body, differentiable)),
                 fold_iter: Box::new(fold_iter),
             }
         }
@@ -444,11 +477,16 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
             Expression::WhileLoop {
                 accumulator: (
                     Identifier(acc_inner.name.to_string()),
-                    Box::new(make_expression(state, funcs, *acc_inner.initial_expression)),
+                    Box::new(make_expression(
+                        state,
+                        funcs,
+                        *acc_inner.initial_expression,
+                        differentiable,
+                    )),
                 ),
-                cond: Box::new(make_expression(state, funcs, *cond)),
-                body: Box::new(make_expression(state, funcs, *body)),
-                exit_body: Box::new(make_expression(state, funcs, *exit_body)),
+                cond: Box::new(make_expression(state, funcs, *cond, differentiable)),
+                body: Box::new(make_expression(state, funcs, *body, differentiable)),
+                exit_body: Box::new(make_expression(state, funcs, *exit_body, differentiable)),
             }
         }
         crate::parser::Expression::ListLit(list_inner) => {
@@ -458,7 +496,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 values: list_inner
                     .values
                     .into_iter()
-                    .map(|value| make_expression(state, funcs, *value))
+                    .map(|value| make_expression(state, funcs, *value, differentiable))
                     .collect(),
             }
         }
@@ -467,35 +505,16 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                 .into_inner()
                 .into_inner()
                 .into_iter()
-                .map(|x| make_expression(state, funcs, *x))
+                .map(|x| make_expression(state, funcs, *x, differentiable))
                 .collect(),
         ),
-        crate::parser::Expression::ProductProject { index, dot: _, value  } => {
-            Expression::ProductProject{
-                value: Box::new(make_expression(state, funcs, *value)),
-                index: (funcs.make_hard)(index.into_inner()),
-            }
-        }
-    }
-}
-
-fn make_expression_range<IntType, FloatType, BoolType, HardType>(
-    state: &mut AstConversionState,
-    funcs: &ProgramInitFunctions<IntType, FloatType, BoolType, HardType>,
-    value: crate::parser::Expression,
-) -> Expression<IntType, FloatType, BoolType, HardType> {
-    match value {
-        crate::parser::Expression::IntegerLit(x) => {
-            Expression::HardInt((funcs.make_hard)(x.into_inner()))
-        }
-        crate::parser::Expression::FunctionApplication {
-            ref func_name,
-            args: _,
-        } => match func_name.to_string().as_str() {
-            "__len" => make_expression(state, funcs, value),
-            _ => unreachable!(),
+        crate::parser::Expression::ProductProject {
+            index,
+            dot: _,
+            value,
+        } => Expression::ProductProject {
+            value: Box::new(make_expression(state, funcs, *value, differentiable)),
+            index: (funcs.make_hard)(index.into_inner()),
         },
-        crate::parser::Expression::ListLit(_) => todo!(),
-        _ => panic!("ranges must be only integers or length of lists"),
     }
 }

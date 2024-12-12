@@ -52,7 +52,7 @@ pub struct VarType {
 pub enum Expression {
     #[parsel(recursive)]
     Product(ProductType),
-    
+
     ProductProject {
         index: parsel::ast::LitInt,
         dot: Token![.],
@@ -125,8 +125,6 @@ pub enum Expression {
         #[parsel(recursive)]
         false_expr: Box<Expression>,
     },
-    
-    
     // },
     //     ListIndex{
     //     #[parsel(recursive)]

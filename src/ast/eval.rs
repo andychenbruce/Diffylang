@@ -28,10 +28,12 @@ enum EnvVars<IntType, FloatType, BoolType, HardType> {
 
 pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
     fn eval_addition_ints(a: IntType, b: IntType) -> IntType;
+    fn eval_addition_hards(a: HardType, b: HardType) -> HardType;
     fn eval_addition_floats(a: FloatType, b: FloatType) -> FloatType;
     fn eval_multiplication_int(a: IntType, b: IntType) -> IntType;
     fn eval_multiplication_floats(a: FloatType, b: FloatType) -> FloatType;
     fn eval_negation_int(a: IntType) -> IntType;
+    fn eval_negation_hard(a: HardType) -> HardType;
     fn eval_negation_float(a: FloatType) -> FloatType;
     fn eval_equality_ints(a: IntType, b: IntType) -> BoolType;
     fn eval_equality_floats(a: FloatType, b: FloatType) -> BoolType;
@@ -163,6 +165,14 @@ where
                         "__gt" => EvalVal::Bool(E::eval_less_than_floats(b, a)),
                         _ => todo!(),
                     },
+                    (EvalVal::Hard(a), EvalVal::Hard(b)) => match func_name.0.as_str() {
+                        "__add" => EvalVal::Hard(E::eval_addition_hards(a, b)),
+                        "__sub" => {
+                            EvalVal::Hard(E::eval_addition_hards(a, E::eval_negation_hard(b)))
+                        }
+                        _ => todo!(),
+                    },
+
                     (EvalVal::Bool(a), EvalVal::Bool(b)) => match func_name.0.as_str() {
                         "__and" => EvalVal::Bool(E::eval_and(a, b)),
                         "__or" => EvalVal::Bool(E::eval_or(a, b)),

@@ -1,5 +1,5 @@
 [bubble_sort_pass ((l : list)) -> list
-  (fold [0, __len(l)] (acc, (l, 0))
+  (fold [0, (__len(l) - 1)] (acc, (l, 0))
    ((let curr = __index(0 . acc, 1 . acc)),
      (let next = __index(0 . acc, (1 . acc + 1)))) in
      if (curr > next) then
