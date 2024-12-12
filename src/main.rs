@@ -27,6 +27,14 @@ fn main() {
     let mut soft_program_ast =
         ast::make_program(program_parse_tree, interpreter_soft::SOFT_AST_INIT);
 
+    let soft_evaluator = interpreter_soft::SoftEvaluator {
+        sigmoid_variance: 1.0,
+        equality_variance: 500.0,
+         sigma_list: 0.5,
+
+    };
+    let hard_evaluator = interpreter::HardEvaluator {};
+    
     if let Some(func_name) = args.get(2) {
         let func_args: Vec<ast::eval::EvalVal<i64, f64, bool, i64>> = args[3..]
             .iter()
@@ -40,11 +48,14 @@ fn main() {
             .collect();
 
         let val = ast::eval::run_function::<_, _, _, _, interpreter::HardEvaluator>(
+            &hard_evaluator,
             &hard_program_ast,
             func_name,
             func_args.clone(),
         );
         eprintln!("val = {:?}", val);
+
+        
 
         let soft_args: Vec<interpreter_soft::SoftValue> = func_args
             .iter()
@@ -60,6 +71,7 @@ fn main() {
             .collect();
 
         let soft_val = ast::eval::run_function::<_, _, _, _, interpreter_soft::SoftEvaluator>(
+            &soft_evaluator,
             &soft_program_ast,
             func_name,
             soft_args,
@@ -69,12 +81,16 @@ fn main() {
     } else {
         eprintln!(
             "test cases = {:?}",
-            ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hard_program_ast)
+            ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(
+                &hard_evaluator,
+                &hard_program_ast
+            )
         );
 
-        for _ in 0..900 {
+        for _ in 0..2000 {
             let soft_cases =
                 ast::eval::eval_test_cases::<_, _, _, _, interpreter_soft::SoftEvaluator>(
+                    &soft_evaluator,
                     &soft_program_ast,
                 );
 
@@ -92,7 +108,7 @@ fn main() {
 
             // println!("average grad = {:?}", average_grad);
 
-            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &(average_grad * 1.0));
+            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &(average_grad * 0.1));
         }
 
         println!(
@@ -103,7 +119,10 @@ fn main() {
 
         eprintln!(
             "test cases fixed maybe = {:?}",
-            ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(&hardened_ast)
+            ast::eval::eval_test_cases::<_, _, _, _, interpreter::HardEvaluator>(
+                &hard_evaluator,
+                &hardened_ast
+            )
         );
     }
 }

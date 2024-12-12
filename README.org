@@ -1,111 +1,16 @@
 * DiffyLang
 A research language for approximating functional programs as a neural nets.
 
-* todo
-** DONE Language parser
-** DONE AST
-** DONE Type checking
-** DONE evaluation
-** DONE soft evaluation
-** DONE calculate gradients
-** DONE gradient descent
-** DONE loss functions
-** TODO switch from cpu to gpu tensors
-
 * Build Instructions
 #+BEGIN_SRC shell
   cargo run -- FILENAME [FUNC NAME] [ARGS ...]
 #+END_SRC
 
+* todo
+** TODO switch from cpu to gpu tensors
+** TODO list insertions
+** TODO division
+** TODO dictionaries
+
 ** Dependencies
-- *Cargo*: Dependencies are managed by Cargo.
-- *LaTeX*: Required for compiling the proposal document.
-
-** Basic arithmetic
-- [X] addition
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [X] subtraction
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [X] multiplcation
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [ ] division
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
-- [X] equality
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [X] greater than
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [X] less than
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-
-** boolean logic
-- [X] and
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [X] or
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [X] not
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-
-** lists
-- [X] getting
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [ ] setting
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
-- [ ] insertion
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
-
-** control flow
-- [X] if else
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-- [X] for loops
-  - only fixed length loops
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-  - [X] be able to access index
-- [X] while loops
-  - represent with a markov chain
-  - [X] hard
-  - [X] soft
-  - [X] gradient
-
-** dictionaries
-- [ ] getting
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
-- [ ] setting
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
-- [ ] inserting
-  - [ ] hard
-  - [ ] soft
-  - [ ] gradient
+- =Cargo=: Dependencies are managed by Cargo.

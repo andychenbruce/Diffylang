@@ -27,39 +27,44 @@ enum EnvVars<IntType, FloatType, BoolType, HardType> {
 }
 
 pub trait Evaluator<IntType, FloatType, BoolType, HardType> {
-    fn eval_addition_ints(a: IntType, b: IntType) -> IntType;
-    fn eval_addition_hards(a: HardType, b: HardType) -> HardType;
-    fn eval_addition_floats(a: FloatType, b: FloatType) -> FloatType;
-    fn eval_multiplication_int(a: IntType, b: IntType) -> IntType;
-    fn eval_multiplication_floats(a: FloatType, b: FloatType) -> FloatType;
-    fn eval_negation_int(a: IntType) -> IntType;
-    fn eval_negation_hard(a: HardType) -> HardType;
-    fn eval_negation_float(a: FloatType) -> FloatType;
-    fn eval_equality_ints(a: IntType, b: IntType) -> BoolType;
-    fn eval_equality_floats(a: FloatType, b: FloatType) -> BoolType;
-    fn eval_less_than_ints(a: IntType, b: IntType) -> BoolType;
-    fn eval_less_than_floats(a: FloatType, b: FloatType) -> BoolType;
-    fn eval_not(a: BoolType) -> BoolType;
-    fn eval_and(a: BoolType, b: BoolType) -> BoolType;
-    fn eval_or(a: BoolType, b: BoolType) -> BoolType;
+    fn eval_addition_ints(&self, a: IntType, b: IntType) -> IntType;
+    fn eval_addition_hards(&self, a: HardType, b: HardType) -> HardType;
+    fn eval_addition_floats(&self, a: FloatType, b: FloatType) -> FloatType;
+    fn eval_multiplication_int(&self, a: IntType, b: IntType) -> IntType;
+    fn eval_multiplication_floats(&self, a: FloatType, b: FloatType) -> FloatType;
+    fn eval_negation_int(&self, a: IntType) -> IntType;
+    fn eval_negation_hard(&self, a: HardType) -> HardType;
+    fn eval_negation_float(&self, a: FloatType) -> FloatType;
+    fn eval_equality_ints(&self, a: IntType, b: IntType) -> BoolType;
+    fn eval_equality_floats(&self, a: FloatType, b: FloatType) -> BoolType;
+    fn eval_less_than_ints(&self, a: IntType, b: IntType) -> BoolType;
+    fn eval_less_than_floats(&self, a: FloatType, b: FloatType) -> BoolType;
+    fn eval_not(&self, a: BoolType) -> BoolType;
+
+    fn eval_and(&self, a: BoolType, b: BoolType) -> BoolType;
+    fn eval_or(&self, a: BoolType, b: BoolType) -> BoolType;
     fn eval_index(
+        &self,
         l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
         i: IntType,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
     fn eval_set_index(
+        &self,
         l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
         i: IntType,
         v: EvalVal<IntType, FloatType, BoolType, HardType>,
     ) -> Vec<EvalVal<IntType, FloatType, BoolType, HardType>>;
-    fn eval_len(l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>) -> HardType;
+    fn eval_len(&self, l: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>) -> HardType;
     fn eval_if(
+        &self,
         cond: BoolType,
         true_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
         false_branch: EvalVal<IntType, FloatType, BoolType, HardType>,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
-    fn stop_while_eval(cond: BoolType) -> bool;
-    fn make_range(start: HardType, end: HardType, num_ids: usize) -> Vec<IntType>;
+    fn stop_while_eval(&self, cond: BoolType) -> bool;
+    fn make_range(&self, start: HardType, end: HardType, num_ids: usize) -> Vec<IntType>;
     fn eval_product_index(
+        &self,
         p: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
         i: HardType,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType>;
@@ -72,6 +77,7 @@ pub fn run_function<
     HardType: Clone + core::fmt::Debug,
     E,
 >(
+    evaluator: &E,
     program: &super::Program<IntType, FloatType, BoolType, HardType>,
     func_name: &str,
     arguments: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
@@ -80,6 +86,7 @@ where
     E: Evaluator<IntType, FloatType, BoolType, HardType>,
 {
     apply_function::<IntType, FloatType, BoolType, HardType, E>(
+        evaluator,
         Env {
             program,
             vars: EnvVars::End,
@@ -120,6 +127,7 @@ fn eval<
     HardType: Clone + core::fmt::Debug,
     E,
 >(
+    evaluator: &E,
     env: Env<IntType, FloatType, BoolType, HardType>,
     expr: &super::Expression<IntType, FloatType, BoolType, HardType>,
 ) -> EvalVal<IntType, FloatType, BoolType, HardType>
@@ -140,94 +148,135 @@ where
         } => match func_name.0.as_str() {
             "__add" | "__sub" | "__mul" | "__div" | "__eq" | "__lt" | "__gt" | "__and" | "__or" => {
                 match (
-                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]),
-                    eval::<IntType, FloatType, BoolType, HardType, E>(env, &args[1]),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        &args[0],
+                    ),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, env, &args[1]),
                 ) {
                     (EvalVal::Int(a), EvalVal::Int(b)) => match func_name.0.as_str() {
-                        "__add" => EvalVal::Int(E::eval_addition_ints(a, b)),
-                        "__sub" => EvalVal::Int(E::eval_addition_ints(a, E::eval_negation_int(b))),
-                        "__mul" => EvalVal::Int(E::eval_multiplication_int(a, b)),
+                        "__add" => EvalVal::Int(evaluator.eval_addition_ints(a, b)),
+                        "__sub" => EvalVal::Int(
+                            evaluator.eval_addition_ints(a, evaluator.eval_negation_int(b)),
+                        ),
+                        "__mul" => EvalVal::Int(evaluator.eval_multiplication_int(a, b)),
                         "__div" => todo!(),
-                        "__eq" => EvalVal::Bool(E::eval_equality_ints(a, b)),
-                        "__lt" => EvalVal::Bool(E::eval_less_than_ints(a, b)),
-                        "__gt" => EvalVal::Bool(E::eval_less_than_ints(b, a)),
+                        "__eq" => EvalVal::Bool(evaluator.eval_equality_ints(a, b)),
+                        "__lt" => EvalVal::Bool(evaluator.eval_less_than_ints(a, b)),
+                        "__gt" => EvalVal::Bool(evaluator.eval_less_than_ints(b, a)),
                         _ => todo!(),
                     },
                     (EvalVal::Float(a), EvalVal::Float(b)) => match func_name.0.as_str() {
-                        "__add" => EvalVal::Float(E::eval_addition_floats(a, b)),
-                        "__sub" => {
-                            EvalVal::Float(E::eval_addition_floats(a, E::eval_negation_float(b)))
-                        }
-                        "__mul" => EvalVal::Float(E::eval_multiplication_floats(a, b)),
+                        "__add" => EvalVal::Float(evaluator.eval_addition_floats(a, b)),
+                        "__sub" => EvalVal::Float(
+                            evaluator.eval_addition_floats(a, evaluator.eval_negation_float(b)),
+                        ),
+                        "__mul" => EvalVal::Float(evaluator.eval_multiplication_floats(a, b)),
                         "__div" => todo!(),
-                        "__eq" => EvalVal::Bool(E::eval_equality_floats(a, b)),
-                        "__lt" => EvalVal::Bool(E::eval_less_than_floats(a, b)),
-                        "__gt" => EvalVal::Bool(E::eval_less_than_floats(b, a)),
+                        "__eq" => EvalVal::Bool(evaluator.eval_equality_floats(a, b)),
+                        "__lt" => EvalVal::Bool(evaluator.eval_less_than_floats(a, b)),
+                        "__gt" => EvalVal::Bool(evaluator.eval_less_than_floats(b, a)),
                         _ => todo!(),
                     },
                     (EvalVal::Hard(a), EvalVal::Hard(b)) => match func_name.0.as_str() {
-                        "__add" => EvalVal::Hard(E::eval_addition_hards(a, b)),
-                        "__sub" => {
-                            EvalVal::Hard(E::eval_addition_hards(a, E::eval_negation_hard(b)))
-                        }
+                        "__add" => EvalVal::Hard(evaluator.eval_addition_hards(a, b)),
+                        "__sub" => EvalVal::Hard(
+                            evaluator.eval_addition_hards(a, evaluator.eval_negation_hard(b)),
+                        ),
                         _ => todo!(),
                     },
 
                     (EvalVal::Bool(a), EvalVal::Bool(b)) => match func_name.0.as_str() {
-                        "__and" => EvalVal::Bool(E::eval_and(a, b)),
-                        "__or" => EvalVal::Bool(E::eval_or(a, b)),
+                        "__and" => EvalVal::Bool(evaluator.eval_and(a, b)),
+                        "__or" => EvalVal::Bool(evaluator.eval_or(a, b)),
                         _ => todo!(),
                     },
                     (x, y) => todo!("THING = {}({:?}, {:?})", func_name.0.as_str(), x, y),
                 }
             }
             "__neg" => {
-                match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]) {
-                    EvalVal::Int(x) => EvalVal::Int(E::eval_negation_int(x)),
-                    EvalVal::Float(x) => EvalVal::Float(E::eval_negation_float(x)),
+                match eval::<IntType, FloatType, BoolType, HardType, E>(
+                    evaluator,
+                    env.clone(),
+                    &args[0],
+                ) {
+                    EvalVal::Int(x) => EvalVal::Int(evaluator.eval_negation_int(x)),
+                    EvalVal::Float(x) => EvalVal::Float(evaluator.eval_negation_float(x)),
                     _ => todo!(),
                 }
             }
             "__not" => {
-                match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]) {
-                    EvalVal::Bool(x) => EvalVal::Bool(E::eval_not(x)),
+                match eval::<IntType, FloatType, BoolType, HardType, E>(
+                    evaluator,
+                    env.clone(),
+                    &args[0],
+                ) {
+                    EvalVal::Bool(x) => EvalVal::Bool(evaluator.eval_not(x)),
                     _ => todo!(),
                 }
             }
 
             "__index" => {
                 match (
-                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]),
-                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[1]),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        &args[0],
+                    ),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        &args[1],
+                    ),
                 ) {
-                    (EvalVal::List(l), EvalVal::Int(i)) => E::eval_index(l, i),
+                    (EvalVal::List(l), EvalVal::Int(i)) => evaluator.eval_index(l, i),
                     _ => todo!(),
                 }
             }
             "__set_index" => {
                 match (
-                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]),
-                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[1]),
-                    eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[2]),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        &args[0],
+                    ),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        &args[1],
+                    ),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        &args[2],
+                    ),
                 ) {
                     (EvalVal::List(l), EvalVal::Int(i), v) => {
-                        EvalVal::List(E::eval_set_index(l, i, v))
+                        EvalVal::List(evaluator.eval_set_index(l, i, v))
                     }
                     _ => todo!(),
                 }
             }
             "__len" => {
-                match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &args[0]) {
-                    EvalVal::List(l) => EvalVal::Hard(E::eval_len(l)),
+                match eval::<IntType, FloatType, BoolType, HardType, E>(
+                    evaluator,
+                    env.clone(),
+                    &args[0],
+                ) {
+                    EvalVal::List(l) => EvalVal::Hard(evaluator.eval_len(l)),
                     _ => todo!(),
                 }
             }
 
             func_name => apply_function::<IntType, FloatType, BoolType, HardType, E>(
+                evaluator,
                 env.clone(),
                 func_name,
                 args.iter()
-                    .map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x))
+                    .map(|x| {
+                        eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, env.clone(), x)
+                    })
                     .collect(),
             ),
         },
@@ -236,6 +285,7 @@ where
                 first: (
                     x.ident.clone(),
                     eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
                         Env {
                             program: env.program,
                             vars: acc.clone(),
@@ -247,6 +297,7 @@ where
             });
 
             eval::<IntType, FloatType, BoolType, HardType, E>(
+                evaluator,
                 Env {
                     program: env.program,
                     vars: new_env,
@@ -258,14 +309,25 @@ where
             boolean,
             true_expr,
             false_expr,
-        } => match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), boolean) {
-            EvalVal::Bool(x) => E::eval_if(
-                x,
-                eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), true_expr),
-                eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), false_expr),
-            ),
-            _ => todo!(),
-        },
+        } => {
+            match eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, env.clone(), boolean)
+            {
+                EvalVal::Bool(x) => evaluator.eval_if(
+                    x,
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        true_expr,
+                    ),
+                    eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        false_expr,
+                    ),
+                ),
+                _ => todo!(),
+            }
+        }
         super::Expression::FoldLoop {
             fold_iter,
             accumulator,
@@ -273,33 +335,47 @@ where
         } => {
             let iter = match **fold_iter {
                 super::FoldIter::Range(ref start, ref end) => {
-                    let start =
-                        match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), start)
-                        {
-                            EvalVal::Hard(x) => x,
-                            _ => unreachable!(),
-                        };
+                    let start = match eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        start,
+                    ) {
+                        EvalVal::Hard(x) => x,
+                        _ => unreachable!(),
+                    };
 
-                    let end =
-                        match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), end) {
-                            EvalVal::Hard(x) => x,
-                            _ => unreachable!(),
-                        };
+                    let end = match eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        end,
+                    ) {
+                        EvalVal::Hard(x) => x,
+                        _ => unreachable!(),
+                    };
 
-                    E::make_range(start, end, env.program.num_ids)
+                    evaluator
+                        .make_range(start, end, env.program.num_ids)
                         .into_iter()
                         .map(|x| EvalVal::Int(x))
                         .collect()
                 }
                 super::FoldIter::ExprList(ref list) => {
-                    match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), list) {
+                    match eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        env.clone(),
+                        list,
+                    ) {
                         EvalVal::List(l) => l,
                         _ => unreachable!(),
                     }
                 }
             };
             iter.into_iter().fold(
-                eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &accumulator.1),
+                eval::<IntType, FloatType, BoolType, HardType, E>(
+                    evaluator,
+                    env.clone(),
+                    &accumulator.1,
+                ),
                 |acc, _| {
                     let new_vars = EnvVars::Rest {
                         first: (accumulator.0.clone(), acc),
@@ -310,7 +386,7 @@ where
                         vars: new_vars,
                     };
 
-                    eval::<IntType, FloatType, BoolType, HardType, E>(new_env, body)
+                    eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, new_env, body)
                 },
             )
         }
@@ -320,8 +396,11 @@ where
             body,
             exit_body,
         } => {
-            let mut acc =
-                eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), &accumulator.1);
+            let mut acc = eval::<IntType, FloatType, BoolType, HardType, E>(
+                evaluator,
+                env.clone(),
+                &accumulator.1,
+            );
 
             let mut exits = vec![];
 
@@ -337,9 +416,11 @@ where
                 };
 
                 let cond_val = {
-                    if let EvalVal::Bool(x) =
-                        eval::<IntType, FloatType, BoolType, HardType, E>(new_env.clone(), cond)
-                    {
+                    if let EvalVal::Bool(x) = eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator,
+                        new_env.clone(),
+                        cond,
+                    ) {
                         x
                     } else {
                         panic!()
@@ -347,14 +428,14 @@ where
                 };
 
                 exits.push((cond_val.clone(), acc.clone()));
-                if E::stop_while_eval(cond_val) {
+                if evaluator.stop_while_eval(cond_val) {
                     break;
                 }
                 if iters > 500 {
                     break;
                 }
 
-                acc = eval::<IntType, FloatType, BoolType, HardType, E>(new_env, body);
+                acc = eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, new_env, body);
 
                 iters += 1;
             }
@@ -369,7 +450,7 @@ where
                     vars: new_vars,
                 };
 
-                eval::<IntType, FloatType, BoolType, HardType, E>(new_env, exit_body)
+                eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, new_env, exit_body)
             };
 
             exits[..exits.len() - 1].iter().fold(
@@ -384,10 +465,11 @@ where
                         vars: new_vars,
                     };
 
-                    let exit_val =
-                        eval::<IntType, FloatType, BoolType, HardType, E>(new_env, exit_body);
+                    let exit_val = eval::<IntType, FloatType, BoolType, HardType, E>(
+                        evaluator, new_env, exit_body,
+                    );
 
-                    E::eval_if(cond.clone(), acc, exit_val)
+                    evaluator.eval_if(cond.clone(), acc, exit_val)
                 },
             )
         }
@@ -397,18 +479,22 @@ where
         } => EvalVal::List(
             values
                 .iter()
-                .map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x))
+                .map(|x| {
+                    eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, env.clone(), x)
+                })
                 .collect(),
         ),
         super::Expression::Product(value) => EvalVal::Product(
             value
                 .iter()
-                .map(|x| eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), x))
+                .map(|x| {
+                    eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, env.clone(), x)
+                })
                 .collect(),
         ),
         super::Expression::ProductProject { value, index } => {
-            match eval::<IntType, FloatType, BoolType, HardType, E>(env.clone(), value) {
-                EvalVal::Product(vals) => E::eval_product_index(vals, index.clone()),
+            match eval::<IntType, FloatType, BoolType, HardType, E>(evaluator, env.clone(), value) {
+                EvalVal::Product(vals) => evaluator.eval_product_index(vals, index.clone()),
                 _ => unreachable!(),
             }
         }
@@ -422,6 +508,7 @@ fn apply_function<
     HardType: Clone + core::fmt::Debug,
     E,
 >(
+    evaluator: &E,
     env: Env<IntType, FloatType, BoolType, HardType>,
     func_name: &str,
     arguments: Vec<EvalVal<IntType, FloatType, BoolType, HardType>>,
@@ -443,6 +530,7 @@ where
         });
 
     eval::<IntType, FloatType, BoolType, HardType, E>(
+        evaluator,
         Env {
             program: env.program,
             vars: env_with_args,
@@ -458,6 +546,7 @@ pub fn eval_test_cases<
     HardType: Clone + core::fmt::Debug,
     E,
 >(
+    evaluator: &E,
     program: &super::Program<IntType, FloatType, BoolType, HardType>,
 ) -> Vec<EvalVal<IntType, FloatType, BoolType, HardType>>
 where
@@ -468,6 +557,8 @@ where
         .iter()
         .map(|test_case| {
             crate::ast::eval::eval::<IntType, FloatType, BoolType, HardType, E>(
+                evaluator,
+
                 Env {
                     program,
                     vars: EnvVars::End,

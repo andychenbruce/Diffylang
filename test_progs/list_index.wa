@@ -3,10 +3,6 @@
   (__index(l, (x + 1)))];
 
 
-[index_list_wrong_2
-  ((l : int), (x : int)) -> bool
-  (__index(l, (x + 2)))];
-
 {(index_list_wrong_1({int ; 0, 100, 20, 0, 0, 30, 0}, 1) == 100)};
 
-{(index_list_wrong_2({int ; 0, 100, 20, 0, 0, 30, 0}, 1) == 100)};
+
