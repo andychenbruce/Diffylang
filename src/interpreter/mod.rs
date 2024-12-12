@@ -81,7 +81,7 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
         a < b
     }
     fn eval_if(
-        &self, 
+        &self,
         cond: bool,
         true_branch: ast::eval::EvalVal<i64, f64, bool, i64>,
         false_branch: ast::eval::EvalVal<i64, f64, bool, i64>,
@@ -98,7 +98,7 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     }
 
     fn eval_index(
-        &self, 
+        &self,
         l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
         i: i64,
     ) -> ast::eval::EvalVal<i64, f64, bool, i64> {
@@ -112,7 +112,7 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     }
 
     fn eval_set_index(
-        &self, 
+        &self,
         mut l: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
         i: i64,
         v: ast::eval::EvalVal<i64, f64, bool, i64>,
@@ -136,7 +136,7 @@ impl crate::ast::eval::Evaluator<i64, f64, bool, i64> for HardEvaluator {
     }
 
     fn eval_product_index(
-        &self, 
+        &self,
         p: Vec<ast::eval::EvalVal<i64, f64, bool, i64>>,
         i: i64,
     ) -> ast::eval::EvalVal<i64, f64, bool, i64> {

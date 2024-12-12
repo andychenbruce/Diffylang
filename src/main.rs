@@ -30,11 +30,10 @@ fn main() {
     let soft_evaluator = interpreter_soft::SoftEvaluator {
         sigmoid_variance: 1.0,
         equality_variance: 500.0,
-         sigma_list: 0.5,
-
+        sigma_list: 0.5,
     };
     let hard_evaluator = interpreter::HardEvaluator {};
-    
+
     if let Some(func_name) = args.get(2) {
         let func_args: Vec<ast::eval::EvalVal<i64, f64, bool, i64>> = args[3..]
             .iter()
@@ -54,8 +53,6 @@ fn main() {
             func_args.clone(),
         );
         eprintln!("val = {:?}", val);
-
-        
 
         let soft_args: Vec<interpreter_soft::SoftValue> = func_args
             .iter()

@@ -558,7 +558,6 @@ where
         .map(|test_case| {
             crate::ast::eval::eval::<IntType, FloatType, BoolType, HardType, E>(
                 evaluator,
-
                 Env {
                     program,
                     vars: EnvVars::End,
