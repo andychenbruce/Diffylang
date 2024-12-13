@@ -1,11 +1,16 @@
 [bubble_sort_pass ((l : list)) -> list
-  (fold [0, (__len(l) - 1)] (acc, (l, 0))
+  (fold [0, (__len(l) - 1)] (acc, (l, 0, false))
    ((let curr = __index(0 . acc, 1 . acc)),
      (let next = __index(0 . acc, (1 . acc + 1)))) in
      if (curr > next) then
-     (swap(0 . acc, 1 . acc, (1 . acc + 1), next, curr), (1 . acc + 1))
+     (swap(0 . acc, 1 . acc, (1 . acc + 1), next, curr), (1 . acc + 1), true)
      else
-     (0 . acc, (1 . acc + 1)))
+     (0 . acc, (1 . acc + 1), 2 . acc))
+];
+
+
+[bubble_sort ((l: list)) -> list
+  (while (acc, l) 2 . bubble_sort_pass(acc) 0 . bubble_sort_pass(acc) acc)
 ];
 
 [swap ((l : list), (index_1 : int), (index_2 : int), (val_1 : int), (val_2 : int)) -> list
@@ -13,5 +18,5 @@
 ];
 
 [bruh () -> int
-  (bubble_sort_pass({int; 4, 1, 2, 3}))
+  (bubble_sort({int; 4, 5, 2, 3}))
 ];
