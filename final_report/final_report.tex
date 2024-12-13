@@ -31,16 +31,16 @@
 \section*{Motivation}
 Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behaviour.
 \section*{Methods}
-If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stoichastic interpretation. For training, we take a set of test cases or specifications that define correctness conditions, we can backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors.
+If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stoichastic interpretation \cite{blondel2024elementsdifferentiableprogramming}. For training, we take a set of test cases or specifications that define correctness conditions, we can backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors.
 \subsection*{Stoichastic perspective}
-The model is defined by 3 hyperparameters along with program AST $T$, each of them is a variance for a stoichastic operation, comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
+The model is defined by 3 hyperparameters along with program AST $T$, each of them is a variance for a stoichastic operation, non-equality comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
 \begin{center}
   $\sigma_{\text{cmp}} \in \mathbb{R}$\\
   $\sigma_{\text{eq}} \in \mathbb{R}$\\
   $\sigma_{\text{list}} \in \mathbb{R}$
 \end{center}
-
 Cumulative comparison operations can be calculated with a convolution over the probability distributions of 2 scalars. With 2 scalars $a$ and $b$ with variances $\sigma_a$ and $\sigma_b$ we can defined softening transformations. With $\Psi$ as the Gaussian CDF, the less than operator ST can be defined as below.
+
 \begin{center}
   HI: $a < b \in \{\text{true}, \text{false}\}$\\
   SI: $P(a - b < 0) = \int_{-\infty}^0 (a \star b) (k) dt = \int_{-\infty}^0 \int_{-\infty}^{\infty} \dfrac{1}{\sigma_a \sqrt{\tau}} \dfrac{1}{\sigma_b \sqrt{\tau}} e^{(\frac{k - a}{\sigma_a})^2}e^{(\frac{t-k + b}{\sigma_b})^2} dk dt = \int_{-\infty}^0 \dfrac{1}{\sqrt{\sigma_a^2 + \sigma_b^2} \sqrt{\tau}} e^{\frac{(t - a + b)^2}{\sigma_a^2 + \sigma_b^2}}dt = \Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \in [0, 1]$
@@ -49,36 +49,46 @@ The Gaussian CDF can then be approximated with a sigmoid function which is easie
 \begin{center}
   $\Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \approx \sigma(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) = \sigma(a - b, \sigma_{\text{cmp}}) \in [0, 1]$
 \end{center}
-
-For equality we use the inner product as a similarity function, and then normalize to keep the values between 0 and 1 for booleans.
+For equality we use the inner product as a similarity function, and then normalize to keep the values between 0 and 1 for booleans. Given some inner space $(F, \langle \cdot, \cdot \rangle)$ we can define the ST for equality to be:
 \begin{center}
-  
+  HI: $(a == b) \in \{\text{true}, \text{false}\}$\\
+  DI: $(a == b) = \dfrac{\langle a, b \rangle}{\sqrt{\langle a, a \rangle \langle b, b \rangle}} \in [0, 1]$
 \end{center}
-
-
-
+The ST for list indexing is a weighted distribution over the index's Gaussian distribution. This method is defined for any vector space $N$ over the field $(\mathbb{R}, *, +)$. The distribution's variance is parameterized by the hyperparameter $\sigma_{\text{list}}$. With a list $l$ of elements $\in N$, and an index $a \in \mathbb{R}$ we define the ST to be
+\begin{center}
+  HI: $l[a] \in N$\\
+  DI: $l[a] = \Psi(-\infty, \frac{1}{2}, \sigma_{\text{list}}) + \sum_1^{i-2}\Psi(a-\frac{1}{2}, a+\frac{1}{2}, \sigma_{\text{list}}) + \Psi(i - 1 - \frac{1}{2}, \infty, \sigma_{\text{list}})$
+\end{center}
+where the addition is the addition of elements of the vector space.
 \subsection*{Hyperparameter optimizations}
-As the hyperparameter variances approach zero, the approximation should approach the real program. $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} SI(T) = HI(T)$.
+As the three hyperparameter variances approach zero, the SI, the ST of a program, should approach the HI. We can say that $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} SI(T) = HI(T)$. If the variances do reach zero, Gaussians will be equivelent delta functions [ADD REFERENCE HERE], and sigmoids become step functions [ADD REFERENCE HERE] recovering non-equality comparisons, recovering the HI behaviour , though this is impractical with real floating point implementation.
 
-To deal with problems such as operatrs not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay.\\
+Comparison operators don't scale with program constant size. For example:
+\begin{center}
+  $g(x) = (1 == x), \dfrac{\partial g}{\partial x} (2) > 0$
+\end{center}
+works, but scaling to bigger numbers
+\begin{center}
+  $f(x) = (1000 == x), \dfrac{\partial f}{\partial x} (2000) \approx 0$\\
+\end{center}
+would usually result in a null derivative as the floating implementation rounds to zero. To deal with problems such as operators not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay.\\
 
-For an epoch $i$, we found the below hyperparameter variance decay to train the model well. 
+For an epoch $i$, we found the below hyperparameter variance decay to train the model well. We expect the constant value $20000$ should be adjusted based on the largest constant in the program AST.
 \begin{center}
   $\sigma_{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
   $\sigma_{\text{eq}} = \text{max}(20000e^{-\frac{i}{300}}, 0.0001)$\\
   $\sigma_{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
 \end{center}
-Due to floating point precisoin, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behaviour more closeley resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-neglegable derivatives for practical training. If the variances do reach zero, gaussians will become delta functions, and sigmoids become step functions, recovering the HI behaviour [ADD REFERENCE HERE], though this is impractical with real floating point implementation.
+Due to floating point precision, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behaviour more closeley resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-neglegable derivatives for practical training. 
 
 \section*{Stuff}
-
 We build upon theoretical insights from differentiable programming \cite{blondel2024elementsdifferentiableprogramming, DBLP:journals/corr/abs-1907-07587, vandemeulebroucke2018myia} and related works. Our contributions include:
 \begin{itemize}
 \item A type system and automatic differentiation framework that transforms discrete imperative code into a differentiable analog.
 \item A hard interpreter (HI) for original code and a soft interpreter (SI) for its differentiable transformation.
-    \item Approaches to complex features: dynamic loss function generation from test cases, handling while loops as Markov chains, differentiable dictionaries, and attempted explorations of Hessian-based optimization methods.
-    \item Hyper parameter optimizations: we tested methods such as the real time adjustment of model parameters during the training process, and adjusting hyperparameters based on the 
-    \item An evaluation showing the feasibility of correcting simple program errors through gradient-based updates.
+\item Approaches to complex features: dynamic loss function generation from test cases, handling while loops as Markov chains, differentiable dictionaries, and attempted explorations of Hessian-based optimization methods.
+\item Hyper parameter optimizations: we tested methods such as the real time adjustment of model parameters during the training process, and adjusting hyperparameters based on the 
+\item An evaluation showing the feasibility of correcting simple program errors through gradient-based updates.
 \end{itemize}
 
 \section{Background and Related Work}
@@ -124,15 +134,38 @@ Key-value lookups in dictionaries are inherently discrete. We implement dictiona
 \subsection{Synthetic Data Generation}
 To train and evaluate the framework, we generate synthetic data by perturbing abstract syntax trees (ASTs) of correct programs. This produces incorrect variants and their corresponding test cases. This approach can generate large training sets, facilitating stable training and evaluation of the method’s ability to correct errors.
 
-\section{Results and Discussion}
-We implemented our framework and tested it on simple toy programs. For instance, consider a program that checks if a number is greater than two but is incorrectly using the threshold of four. By softening the comparison and introducing a parameter $C$, we can backpropagate from test cases (e.g., inputs around 2) to adjust $C$ towards the correct threshold.
+\section{Results}
+We implemented our framework and tested it on various programs.
 
-Empirically, we observed:
-\begin{itemize}
-    \item Programs with simple arithmetic and conditional logic can be partially corrected by gradient-based updates.
-    \item Loss convergence suggests that softened parameters often move toward correct values.
-    \item More complex programs with loops, dictionaries, and intricate logic remain challenging due to non-differentiability and high computational costs.
-\end{itemize}
+We have been able to correct arbitrary index offsets of lists.
+
+INSERT graph HERE
+
+\begin{verbatim}
+[bubble_sort_pass ((l : list)) -> list
+  (fold [0, (__len(l) - 1)] (acc, (l, 0, false))
+    ((let curr = __index(0 . acc, 1 . acc)),
+      (let next = __index(0 . acc, (1 . acc + 1)))) in
+      if (curr > next) then
+      (swap(0 . acc, 1 . acc, (1 . acc + 2), next, curr), (1 . acc + 1), true)
+      else
+      (0 . acc, (1 . acc + 1), 2 . acc))
+];
+
+[bubble_sort ((l: list)) -> list
+  (while (acc, l) 2 . bubble_sort_pass(acc) 0 . bubble_sort_pass(acc) acc)
+];
+
+[swap ((l : list),
+       (index_1 : int),
+       (index_2 : int),
+       (val_1 : int),
+       (val_2 : int)) -> list
+  (__set_index(__set_index(l, index_1, val_1), index_2, val_2))
+];
+\end{verbatim}
+
+BUBBLE SORT loss graph here
 
 \section{Limitations}
 Several obstacles remain:
@@ -140,15 +173,17 @@ Several obstacles remain:
     \item \textbf{Hessian Invertability:} ended up giving up on this
     \item \textbf{While loops are slow:} Infinite loops, variable-length lists, and string keys are difficult to soften. Many data structures must be approximated in restrictive ways.
     \item \textbf{Scalability:} Gradient computations, especially Hessians, grow quickly in cost. Larger programs may be infeasible to handle with this approach.
+    \item \textbf{CUDA not applicable:} Our neural network doesn't use large tensor optimizations
 \end{itemize}
+
+while loops with exponential
 
 \section{Conclusion and Future Work}
 This work demonstrates a proof-of-concept for automatically correcting program errors using deep learning optimization methods. By approximating programs as neural networks and defining differentiable substitutes for discrete operations, we open the door to gradient-based program repair.
 
 Future directions include:
 \begin{itemize}
-    \item \textbf{Richer Data Structures and Control Flow:} Expanding differentiability to handle more complex language features efficiently.
-    \item \textbf{Performance Optimization:} Leveraging GPU acceleration and more efficient differentiation frameworks to scale to larger programs.
+    \item \textbf{Performance Optimization:} Use cuda graph compilation computations.
     \item \textbf{Advanced Optimization Methods:} Improving convergence with second-order methods and more sophisticated meta-optimizers.
     \item \textbf{Comprehensive Evaluation:} Testing on non-trivial codebases and real-world bugs to assess practical utility.
 \end{itemize}
