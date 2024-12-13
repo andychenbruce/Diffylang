@@ -43,17 +43,23 @@ Cumulative comparison operations can be calculated with a convolution over the p
 
 \begin{center}
   HI: $a < b \in \{\text{true}, \text{false}\}$\\
-  SI: $P(a - b < 0) = \int_{-\infty}^0 (a \star b) (k) dt = \int_{-\infty}^0 \int_{-\infty}^{\infty} \dfrac{1}{\sigma_a \sqrt{\tau}} \dfrac{1}{\sigma_b \sqrt{\tau}} e^{(\frac{k - a}{\sigma_a})^2}e^{(\frac{t-k + b}{\sigma_b})^2} dk dt = \int_{-\infty}^0 \dfrac{1}{\sqrt{\sigma_a^2 + \sigma_b^2} \sqrt{\tau}} e^{\frac{(t - a + b)^2}{\sigma_a^2 + \sigma_b^2}}dt = \Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \in [0, 1]$
+  SI: $P(a - b < 0) = \int_{-\infty}^0 (a \star b) (k) dt = \int_{-\infty}^0 \int_{-\infty}^{\infty} \dfrac{1}{\sigma_a \sqrt{\tau}} \dfrac{1}{\sigma_b \sqrt{\tau}} e^{\frac{1}{2}(\frac{k - a}{\sigma_a})^2}e^{\frac{1}{2}(\frac{t-k + b}{\sigma_b})^2} dk dt = \int_{-\infty}^0 \dfrac{1}{\sqrt{\sigma_a^2 + \sigma_b^2} \sqrt{\tau}} e^{\frac{1}{2}\frac{(t - a + b)^2}{\sigma_a^2 + \sigma_b^2}}dt = \Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \in [0, 1]$
 \end{center}
 The Gaussian CDF can then be approximated with a sigmoid function which is easier to calculate. The variance is defined as the model hyperparameter $\sigma_{\text{cmp}}$.
 \begin{center}
   $\Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \approx \sigma(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) = \sigma(a - b, \sigma_{\text{cmp}}) \in [0, 1]$
 \end{center}
-For equality we use the inner product as a similarity function, and then normalize to keep the values between 0 and 1 for booleans. Given some inner space $(F, \langle \cdot, \cdot \rangle)$ we can define the ST for equality to be:
+For equality we use the inner product as a similarity function, and then normalize to keep the values between 0 and 1 for booleans. Given some inner space $(F, \langle \cdot, \cdot \rangle)$ and a kernel function $\phi$ we can define the ST for equality to be
 \begin{center}
   HI: $(a == b) \in \{\text{true}, \text{false}\}$\\
-  DI: $(a == b) = \dfrac{\langle a, b \rangle}{\sqrt{\langle a, a \rangle \langle b, b \rangle}} \in [0, 1]$
+  DI: $(a == b) = \dfrac{\langle \phi(a), \phi(b) \rangle}{\sqrt{\langle \phi(a), \phi(a) \rangle \langle \phi(b), \phi(b) \rangle}} \in [0, 1]$
 \end{center}
+where the kernel function is defined as a convolution as such that
+\begin{center}
+  $\langle \phi(a), \phi(b) \rangle = \int_{-\infty}^{\infty} \dfrac{1}{\sigma_a \sqrt{\tau}} \dfrac{1}{\sigma_b \sqrt{\tau}} e^{\frac{1}{2}(\frac{k - a}{\sigma_a})^2}e^{\frac{1}{2}(\frac{-k - b}{\sigma_b})^2} dk = \dfrac{1}{\sigma_{\text{eq}} \sqrt{\tau}} e^{\frac{1}{2}(\frac{a - b}{\sigma_{\text{eq}}})^2}$.
+\end{center}
+
+
 The ST for list indexing is a weighted distribution over the index's Gaussian distribution. This method is defined for any vector space $N$ over the field $(\mathbb{R}, *, +)$. The distribution's variance is parameterized by the hyperparameter $\sigma_{\text{list}}$. With a list $l$ of elements $\in N$, and an index $a \in \mathbb{R}$ we define the ST to be
 \begin{center}
   HI: $l[a] \in N$\\
@@ -73,6 +79,8 @@ works, but scaling to bigger numbers
 \end{center}
 would usually result in a null derivative as the floating implementation rounds to zero. To deal with problems such as operators not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay.\\
 
+%% ADD REFERENCE https://arxiv.org/pdf/1910.07454
+
 For an epoch $i$, we found the below hyperparameter variance decay to train the model well. We expect the constant value $20000$ should be adjusted based on the largest constant in the program AST.
 \begin{center}
   $\sigma_{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
@@ -81,33 +89,36 @@ For an epoch $i$, we found the below hyperparameter variance decay to train the 
 \end{center}
 Due to floating point precision, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behaviour more closeley resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-neglegable derivatives for practical training. 
 
-\section*{Stuff}
-We build upon theoretical insights from differentiable programming \cite{blondel2024elementsdifferentiableprogramming, DBLP:journals/corr/abs-1907-07587, vandemeulebroucke2018myia} and related works. Our contributions include:
-\begin{itemize}
-\item A type system and automatic differentiation framework that transforms discrete imperative code into a differentiable analog.
-\item A hard interpreter (HI) for original code and a soft interpreter (SI) for its differentiable transformation.
-\item Approaches to complex features: dynamic loss function generation from test cases, handling while loops as Markov chains, differentiable dictionaries, and attempted explorations of Hessian-based optimization methods.
-\item Hyper parameter optimizations: we tested methods such as the real time adjustment of model parameters during the training process, and adjusting hyperparameters based on the 
-\item An evaluation showing the feasibility of correcting simple program errors through gradient-based updates.
-\end{itemize}
+\section*{Type system}
+Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indicies.
+
+Create two types of scalars: soft and hard scalars.
+
+Because the length of lists are deterministic from a function call, they can be expressed as GADT's parameterized over the natural numbers, which can then be represented as a vector space over elements, assuming the elements form a field.
+
+
+%% \section*{idk}
+
+%% We build upon theoretical insights from differentiable programming \cite{blondel2024elementsdifferentiableprogramming, DBLP:journals/corr/abs-1907-07587, vandemeulebroucke2018myia} and related works. Our contributions include:
+%% \begin{itemize}
+%% \item A type system and automatic differentiation framework that transforms discrete imperative code into a differentiable analog.
+%% \item A hard interpreter (HI) for original code and a soft interpreter (SI) for its differentiable transformation.
+%% \item Approaches to complex features: dynamic loss function generation from test cases, handling while loops as Markov chains, differentiable dictionaries, and attempted explorations of Hessian-based optimization methods.
+%% \item Hyper parameter optimizations: we tested methods such as the real time adjustment of model parameters during the training process, and adjusting hyperparameters based on the 
+%% \item An evaluation showing the feasibility of correcting simple program errors through gradient-based updates.
+%% \end{itemize}
 
 \section{Background and Related Work}
-\paragraph{Differentiable Programming.} Differentiable programming aims to integrate gradient-based optimization into the software development process, allowing parameters within code to be tuned automatically \cite{blondel2024elementsdifferentiableprogramming,DBLP:journals/corr/abs-1907-07587,vandemeulebroucke2018myia}. Earlier works have explored differentiable interpreters and soft approximations of discrete structures, but significant challenges remain in applying these ideas to general imperative programs.
+\paragraph{Differentiable Programming} Differentiable programming aims to integrate gradient-based optimization into the software development process, allowing parameters within code to be tuned automatically \cite{blondel2024elementsdifferentiableprogramming,DBLP:journals/corr/abs-1907-07587,vandemeulebroucke2018myia}. Earlier works have explored differentiable interpreters and soft approximations of discrete structures, but significant challenges remain in applying these ideas to general imperative programs.
 
-\paragraph{Automated Program Repair.} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes leveraging gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
+\paragraph{Automated Program Repair} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes leveraging gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
 
 \section{Methodology}
-
 \subsection{Auto-Differentiation Framework and Custom Type System}
 To apply deep learning techniques, we must convert programs into a form amenable to backpropagation. We implement an auto-differentiation framework that operates on an intermediate representation of the code, modeled as a computational graph. This involves:
-\begin{itemize}
-    \item \textbf{Custom Type System:} Variables and values in the code are assigned types that describe how they interact and can be ``softened.'' For instance, booleans become probabilities in $[0,1]$, integers become real numbers, and indexing operations become probabilistic lookups.
-    \item \textbf{Soft Interpreter:} Alongside the original (hard) interpreter that executes discrete code, we define a soft interpreter that executes the softened code. Control flow, arithmetic, and data structure operations are replaced with smooth approximations.
-    \item \textbf{Gradient Computation:} We manually implement both first- and second-order derivatives (gradients and Hessians) to enable backpropagation and potential use of second-order optimization methods.
-\end{itemize}
 
-\subsection{Softening and Hardening Code}
-The core idea is to replace discrete program constructs with differentiable counterparts:
+\subsection{Hardening Code}
+After a model is trained, the SI representation must be converted back to a HI representation.
 \begin{itemize}
     \item \textbf{Boolean Softening:} A boolean condition is replaced by a continuous probability (e.g., via a sigmoid function). Thus, `if (x > 2)` becomes `if (sigmoid(x - 2))`.
     \item \textbf{Integer Softening:} Integers can be represented by real numbers. For indexing, we may represent indices as Gaussian distributions over array positions, enabling differentiable approximations of discrete indexing.
@@ -173,7 +184,7 @@ Several obstacles remain:
     \item \textbf{Hessian Invertability:} ended up giving up on this
     \item \textbf{While loops are slow:} Infinite loops, variable-length lists, and string keys are difficult to soften. Many data structures must be approximated in restrictive ways.
     \item \textbf{Scalability:} Gradient computations, especially Hessians, grow quickly in cost. Larger programs may be infeasible to handle with this approach.
-    \item \textbf{CUDA not applicable:} Our neural network doesn't use large tensor optimizations
+    \item \textbf{CUDA not applicable:} Our neural network doesn't use large tensor optimizations. Usually won't use feed forward networks.
 \end{itemize}
 
 while loops with exponential
