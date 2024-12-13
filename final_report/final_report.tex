@@ -1,30 +1,23 @@
-% main.tex - Final Report in NeurIPS format, references in refs.bib
 \documentclass{article}
-
-% \usepackage{neurips_2023} % Uncomment this line if you have the NeurIPS style file.
-% For the sake of this example, we'll assume the style file is included externally.
-% In a real submission, please follow the NeurIPS formatting instructions exactly.
-
+\usepackage{neurips_2023}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{hyperref}       % hyperlinks
-\usepackage{url}            % simple URL typesetting
-\usepackage{amsmath,amssymb,amsfonts}       % blackboard math symbols
-\usepackage{graphicx}
-\usepackage{booktabs}       % professional-quality tables
-\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{nicefrac}
+\usepackage{microtype}
 \usepackage{xcolor}
-\usepackage{enumitem}
-\usepackage{wrapfig}
-
-\title{Approximating Imperative Programs as Neural Networks for Automated Correction}
+\title{Approximating Programs as Neural Networks for Automated Correction}
 
 \author{
-Andrew Bruce \\ \href{mailto:acbruce@ucsc.edu}{acbruce@ucsc.edu}
-\and
-Dongjing Wang \\ \href{mailto:dwang114@ucsc.edu}{dwang114@ucsc.edu}
-\and
-Ming Qi \\ \href{mailto:mqi6@ucsc.edu}{mqi6@ucsc.edu}
+  Andrew Bruce \\ \href{mailto:acbruce@ucsc.edu}{acbruce@ucsc.edu}
+  \and
+  Dongjing Wang \\ \href{mailto:dwang114@ucsc.edu}{dwang114@ucsc.edu}
+  \and
+  Ming Qi \\ \href{mailto:mqi6@ucsc.edu}{mqi6@ucsc.edu}
 }
 
 \begin{document}
@@ -32,20 +25,41 @@ Ming Qi \\ \href{mailto:mqi6@ucsc.edu}{mqi6@ucsc.edu}
 \maketitle
 
 \begin{abstract}
-We present a novel approach to automated program correction by approximating imperative programs as neural networks. Our framework ``softens'' discrete code operations into differentiable analogs, enabling gradient-based optimization to correct parameters in the code. We build upon theoretical foundations introduced by recent work and implement an automatic differentiation framework for arbitrary imperative code. We also incorporate custom type systems to handle complex control flows, implement differentiable data structures, and utilize Markovian representations of loops. While our technique demonstrates the ability to correct simple code errors via gradient descent and related optimization methods, we note key limitations: convergence does not guarantee correctness, and non-differentiable behaviors remain challenging. Nevertheless, this work lays groundwork towards automated, data-driven program repair through neural optimization.
+  We present an approach for automated program correction given test cases. Our framework approaches discreet operations as a stoichastic process, representing scalars as gaussian distributions. Each distribution has a mean of the value of the scalar, with the variance as a hyperparameter. This representation allows differentiation of usually discontinious operations, and applying machine learning gradient descent on the program with respect to parameters. In this paper we show training methods, hyperparameter estimation, and results at correction. These methods could potentially have applications in increasing accuraccy of LLM code generation and hash function attacks.
 \end{abstract}
 
-\section{Introduction}
-Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, search, or constraint solving, but often struggle when code semantics must be tuned or learned directly from data and examples. We propose an approach that treats programs as differentiable computational graphs, enabling the use of deep learning optimization techniques to correct code parameters.
+\section*{Motivation}
+Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behaviour.
+\section*{Methods}
+This idea is motivated by the observation that if we can ``soften'' discrete operations in code (e.g., conditionals, integer operations, indexing) into a stoichastic process, then the program itself can be interpreted as a neural network. Given a set of test cases or specifications that define correctness conditions, we can backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors.
+\subsection*{Stoichastic perspective}
+The model is defined by 3 hyperparameters along with program AST $T$, each of them is a variance for a stoichastic operation, comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
+\begin{center}
+  $\sigma_{\text{cmp}} \in \mathbb{R}$\\
+  $\sigma_{\text{eq}} \in \mathbb{R}$\\
+  $\sigma_{\text{list}} \in \mathbb{R}$
+\end{center}
+\subsection*{Hyperparameter optimizations}
+As the hyperparameter variances approach zero, the approximation should approach the real program. $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} SI(T) = HI(T)$.
 
-This idea is motivated by the observation that if we can ``soften'' discrete operations in code (e.g., conditionals, integer operations, indexing) into differentiable approximations, then the program itself can be interpreted as a neural network. Given a set of test cases or specifications that define correctness conditions, we can backpropagate from a loss function representing deviation from correct behavior. Updates to program parameters can effectively ``correct'' logical or arithmetic errors.
+To deal with problems such as operatrs not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay.\\
+
+For an epoch $i$, we found the below hyperparameter variance decay to train the model well. 
+\begin{center}
+  $\sigma{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
+  $\sigma{\text{eq}} = \text{max}(20000e^{-\frac{i}{300}}, 0.0001)$\\
+  $\sigma{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
+\end{center}
+Due to floating point precisoin, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behaviour more closeley resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-neglegable derivatives for practical training. If the variances do reach zero, gaussians will become delta functions, and sigmoids become step functions, recovering the HI behaviour [ADD REFERENCE HERE], though this is impractical with real floating point implementation.
+
+\section*{Stuff}
 
 We build upon theoretical insights from differentiable programming \cite{blondel2024elementsdifferentiableprogramming, DBLP:journals/corr/abs-1907-07587, vandemeulebroucke2018myia} and related works. Our contributions include:
-\begin{itemize}[leftmargin=*]
-    \item A type system and automatic differentiation framework that transforms discrete imperative code into a differentiable analog.
-    \item A ``hard interpreter'' for original code and a ``soft interpreter'' for its differentiable approximation.
-    \item Techniques for softening discrete operations (e.g., booleans, integer indexing, control flow) and hardening them back after optimization.
-    \item Approaches to complex features: dynamic loss function generation from test cases, handling while loops as Markov chains, differentiable dictionaries, and initial explorations of Hessian-based optimization methods.
+\begin{itemize}
+\item A type system and automatic differentiation framework that transforms discrete imperative code into a differentiable analog.
+\item A hard interpreter (HI) for original code and a soft interpreter (SI) for its differentiable transformation.
+    \item Approaches to complex features: dynamic loss function generation from test cases, handling while loops as Markov chains, differentiable dictionaries, and attempted explorations of Hessian-based optimization methods.
+    \item Hyper parameter optimizations: we tested methods such as the real time adjustment of model parameters during the training process, and adjusting hyperparameters based on the 
     \item An evaluation showing the feasibility of correcting simple program errors through gradient-based updates.
 \end{itemize}
 
@@ -58,7 +72,7 @@ We build upon theoretical insights from differentiable programming \cite{blondel
 
 \subsection{Auto-Differentiation Framework and Custom Type System}
 To apply deep learning techniques, we must convert programs into a form amenable to backpropagation. We implement an auto-differentiation framework that operates on an intermediate representation of the code, modeled as a computational graph. This involves:
-\begin{itemize}[leftmargin=*]
+\begin{itemize}
     \item \textbf{Custom Type System:} Variables and values in the code are assigned types that describe how they interact and can be ``softened.'' For instance, booleans become probabilities in $[0,1]$, integers become real numbers, and indexing operations become probabilistic lookups.
     \item \textbf{Soft Interpreter:} Alongside the original (hard) interpreter that executes discrete code, we define a soft interpreter that executes the softened code. Control flow, arithmetic, and data structure operations are replaced with smooth approximations.
     \item \textbf{Gradient Computation:} We manually implement both first- and second-order derivatives (gradients and Hessians) to enable backpropagation and potential use of second-order optimization methods.
@@ -66,7 +80,7 @@ To apply deep learning techniques, we must convert programs into a form amenable
 
 \subsection{Softening and Hardening Code}
 The core idea is to replace discrete program constructs with differentiable counterparts:
-\begin{itemize}[leftmargin=*]
+\begin{itemize}
     \item \textbf{Boolean Softening:} A boolean condition is replaced by a continuous probability (e.g., via a sigmoid function). Thus, `if (x > 2)` becomes `if (sigmoid(x - 2))`.
     \item \textbf{Integer Softening:} Integers can be represented by real numbers. For indexing, we may represent indices as Gaussian distributions over array positions, enabling differentiable approximations of discrete indexing.
 \end{itemize}
@@ -96,7 +110,7 @@ To train and evaluate the framework, we generate synthetic data by perturbing ab
 We implemented our framework and tested it on simple toy programs. For instance, consider a program that checks if a number is greater than two but is incorrectly using the threshold of four. By softening the comparison and introducing a parameter $C$, we can backpropagate from test cases (e.g., inputs around 2) to adjust $C$ towards the correct threshold.
 
 Empirically, we observed:
-\begin{itemize}[leftmargin=*]
+\begin{itemize}
     \item Programs with simple arithmetic and conditional logic can be partially corrected by gradient-based updates.
     \item Loss convergence suggests that softened parameters often move toward correct values.
     \item More complex programs with loops, dictionaries, and intricate logic remain challenging due to non-differentiability and high computational costs.
@@ -104,7 +118,7 @@ Empirically, we observed:
 
 \section{Limitations}
 Several obstacles remain:
-\begin{itemize}[leftmargin=*]
+\begin{itemize}
     \item \textbf{Convergence Issues:} Zero loss in the softened domain does not guarantee correctness in the hardened, discrete program.
     \item \textbf{Non-Differentiability:} Certain operations have null second derivatives or discontinuities, limiting the applicability of second-order methods.
     \item \textbf{Complex Structures:} Infinite loops, variable-length lists, and string keys are difficult to soften. Many data structures must be approximated in restrictive ways.
@@ -115,7 +129,7 @@ Several obstacles remain:
 This work demonstrates a proof-of-concept for automatically correcting program errors using deep learning optimization methods. By approximating programs as neural networks and defining differentiable substitutes for discrete operations, we open the door to gradient-based program repair.
 
 Future directions include:
-\begin{itemize}[leftmargin=*]
+\begin{itemize}
     \item \textbf{Richer Data Structures and Control Flow:} Expanding differentiability to handle more complex language features efficiently.
     \item \textbf{Performance Optimization:} Leveraging GPU acceleration and more efficient differentiation frameworks to scale to larger programs.
     \item \textbf{Advanced Optimization Methods:} Improving convergence with second-order methods and more sophisticated meta-optimizers.
@@ -127,4 +141,8 @@ Though many challenges remain, our approach represents a step toward integrating
 \bibliographystyle{abbrv}
 \bibliography{refs}
 
+
 \end{document}
+
+
+\documentclass{article}
