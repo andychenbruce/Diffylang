@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage[final]{neurips_2023}
+\usepackage[preprint]{neurips_2023}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{hyperref}
@@ -31,7 +31,7 @@
 \section*{Motivation}
 Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behaviour.
 \section*{Methods}
-This idea is motivated by the observation that if we can ``soften'' discrete operations in code (e.g., conditionals, integer operations, indexing) into a stoichastic process, then the program itself can be interpreted as a neural network. Given a set of test cases or specifications that define correctness conditions, we can backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors.
+If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stoichastic interpretation. For training, we take a set of test cases or specifications that define correctness conditions, we can backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors.
 \subsection*{Stoichastic perspective}
 The model is defined by 3 hyperparameters along with program AST $T$, each of them is a variance for a stoichastic operation, comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
 \begin{center}
@@ -39,6 +39,24 @@ The model is defined by 3 hyperparameters along with program AST $T$, each of th
   $\sigma_{\text{eq}} \in \mathbb{R}$\\
   $\sigma_{\text{list}} \in \mathbb{R}$
 \end{center}
+
+Cumulative comparison operations can be calculated with a convolution over the probability distributions of 2 scalars. With 2 scalars $a$ and $b$ with variances $\sigma_a$ and $\sigma_b$ we can defined softening transformations. With $\Psi$ as the Gaussian CDF, the less than operator ST can be defined as below.
+\begin{center}
+  HI: $a < b \in \{\text{true}, \text{false}\}$\\
+  SI: $P(a - b < 0) = \int_{-\infty}^0 (a \star b) (k) dt = \int_{-\infty}^0 \int_{-\infty}^{\infty} \dfrac{1}{\sigma_a \sqrt{\tau}} \dfrac{1}{\sigma_b \sqrt{\tau}} e^{(\frac{k - a}{\sigma_a})^2}e^{(\frac{t-k + b}{\sigma_b})^2} dk dt = \int_{-\infty}^0 \dfrac{1}{\sqrt{\sigma_a^2 + \sigma_b^2} \sqrt{\tau}} e^{\frac{(t - a + b)^2}{\sigma_a^2 + \sigma_b^2}}dt = \Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \in [0, 1]$
+\end{center}
+The Gaussian CDF can then be approximated with a sigmoid function which is easier to calculate. The variance is defined as the model hyperparameter $\sigma_{\text{cmp}}$.
+\begin{center}
+  $\Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \approx \sigma(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) = \sigma(a - b, \sigma_{\text{cmp}}) \in [0, 1]$
+\end{center}
+
+For equality we use the inner product as a similarity function, and then normalize to keep the values between 0 and 1 for booleans.
+\begin{center}
+  
+\end{center}
+
+
+
 \subsection*{Hyperparameter optimizations}
 As the hyperparameter variances approach zero, the approximation should approach the real program. $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} SI(T) = HI(T)$.
 
@@ -46,9 +64,9 @@ To deal with problems such as operatrs not scaling with program constant sizes w
 
 For an epoch $i$, we found the below hyperparameter variance decay to train the model well. 
 \begin{center}
-  $\sigma{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
-  $\sigma{\text{eq}} = \text{max}(20000e^{-\frac{i}{300}}, 0.0001)$\\
-  $\sigma{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
+  $\sigma_{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
+  $\sigma_{\text{eq}} = \text{max}(20000e^{-\frac{i}{300}}, 0.0001)$\\
+  $\sigma_{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
 \end{center}
 Due to floating point precisoin, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behaviour more closeley resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-neglegable derivatives for practical training. If the variances do reach zero, gaussians will become delta functions, and sigmoids become step functions, recovering the HI behaviour [ADD REFERENCE HERE], though this is impractical with real floating point implementation.
 
@@ -119,9 +137,8 @@ Empirically, we observed:
 \section{Limitations}
 Several obstacles remain:
 \begin{itemize}
-    \item \textbf{Convergence Issues:} Zero loss in the softened domain does not guarantee correctness in the hardened, discrete program.
-    \item \textbf{Non-Differentiability:} Certain operations have null second derivatives or discontinuities, limiting the applicability of second-order methods.
-    \item \textbf{Complex Structures:} Infinite loops, variable-length lists, and string keys are difficult to soften. Many data structures must be approximated in restrictive ways.
+    \item \textbf{Hessian Invertability:} ended up giving up on this
+    \item \textbf{While loops are slow:} Infinite loops, variable-length lists, and string keys are difficult to soften. Many data structures must be approximated in restrictive ways.
     \item \textbf{Scalability:} Gradient computations, especially Hessians, grow quickly in cost. Larger programs may be infeasible to handle with this approach.
 \end{itemize}
 
