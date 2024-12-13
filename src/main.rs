@@ -4,6 +4,10 @@ mod interpreter;
 mod interpreter_soft;
 mod parser;
 
+const LEARNING_RATE: f64 = 0.5;
+const NUM_ITERS: i32 = 100;
+const VARIANCE_MIN: f64 = 0.0001;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -27,14 +31,15 @@ fn main() {
     let mut soft_program_ast =
         ast::make_program(program_parse_tree, interpreter_soft::SOFT_AST_INIT);
 
-    let soft_evaluator = interpreter_soft::SoftEvaluator {
-        sigmoid_variance: 1.0,
-        equality_variance: 500.0,
-        sigma_list: 0.5,
-    };
     let hard_evaluator = interpreter::HardEvaluator {};
 
     if let Some(func_name) = args.get(2) {
+        let soft_evaluator = interpreter_soft::SoftEvaluator {
+            sigmoid_variance: VARIANCE_MIN,
+            equality_variance: VARIANCE_MIN,
+            sigma_list: VARIANCE_MIN,
+        };
+
         let func_args: Vec<ast::eval::EvalVal<i64, f64, bool, i64>> = args[3..]
             .iter()
             .map(|x| {
@@ -84,7 +89,17 @@ fn main() {
             )
         );
 
-        for _ in 0..2000 {
+        for i in 0..NUM_ITERS {
+            let equality_variance = f64::max((-(i as f64) / 300.0).exp() * 2.0, VARIANCE_MIN);
+            let sigmoid_variance = f64::max((-(i as f64) / 300.0).exp() * 1.0, VARIANCE_MIN);
+            let sigma_list = f64::max((-(i as f64) / 300.0).exp() * 1.0, VARIANCE_MIN);
+
+            let soft_evaluator = interpreter_soft::SoftEvaluator {
+                sigmoid_variance,
+                equality_variance,
+                sigma_list,
+            };
+
             let soft_cases =
                 ast::eval::eval_test_cases::<_, _, _, _, interpreter_soft::SoftEvaluator>(
                     &soft_evaluator,
@@ -105,7 +120,10 @@ fn main() {
 
             // println!("average grad = {:?}", average_grad);
 
-            interpreter_soft::apply_gradient_program(&mut soft_program_ast, &(average_grad * 0.1));
+            interpreter_soft::apply_gradient_program(
+                &mut soft_program_ast,
+                &(average_grad * LEARNING_RATE),
+            );
         }
 
         println!(

@@ -1,0 +1,28 @@
+[merg_sort ((l : list)) -> list
+  (fold [0, (__len(l) - 1)] (acc, (l, 0, false))
+   ((let curr = __index(0 . acc, 1 . acc)),
+     (let next = __index(0 . acc, (1 . acc + 1)))) in
+     if (curr > next) then
+     (swap(0 . acc, 1 . acc, (1 . acc + 0), next, curr), (1 . acc + 0), true)
+     else
+     (0 . acc, (1 . acc + 1), 2 . acc))
+];
+
+
+[merge ((l: list)) -> list
+  (while (acc, l) 2 . merge_sort(acc) 0 . merge_sort(acc) acc)
+];
+
+[swap ((l : list), (index_1 : int), (index_2 : int), (val_1 : int), (val_2 : int)) -> list
+      (__set_index(__set_index(l, index_1, val_1), index_2, val_2))
+];
+
+[bruh () -> int
+  (merge_sort({int; 4, 5, 2, 3}))
+];
+
+
+{(__index(bruh(), 0) == 2)};
+{(__index(bruh(), 1) == 3)};
+{(__index(bruh(), 2) == 4)};
+{(__index(bruh(), 3) == 5)};

@@ -3,7 +3,7 @@
    ((let curr = __index(0 . acc, 1 . acc)),
      (let next = __index(0 . acc, (1 . acc + 1)))) in
      if (curr > next) then
-     (swap(0 . acc, 1 . acc, (1 . acc + 1), next, curr), (1 . acc + 1), true)
+     (swap(0 . acc, 1 . acc, (1 . acc + 2), next, curr), (1 . acc + 1), true)
      else
      (0 . acc, (1 . acc + 1), 2 . acc))
 ];
@@ -20,3 +20,9 @@
 [bruh () -> int
   (bubble_sort({int; 4, 5, 2, 3}))
 ];
+
+
+{(__index(bruh(), 0) == 2)};
+{(__index(bruh(), 1) == 3)};
+{(__index(bruh(), 2) == 4)};
+{(__index(bruh(), 3) == 5)};

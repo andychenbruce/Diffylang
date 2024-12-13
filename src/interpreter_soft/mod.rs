@@ -138,7 +138,7 @@ fn apply_gradient_expr(
         ast::Expression::Integer(val, id) => val.val += grad.values[id.0.unwrap()],
         ast::Expression::Float(val, id) => val.val += grad.values[id.0.unwrap()],
         ast::Expression::Str(_, _) => todo!(),
-        ast::Expression::Bool(_, _) => todo!(),
+        ast::Expression::Bool(val, id) => val.val += grad.values[id.0.unwrap()],
         ast::Expression::FuncApplication {
             func_name: _,
             args,
