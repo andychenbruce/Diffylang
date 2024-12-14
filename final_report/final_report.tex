@@ -38,7 +38,7 @@
 Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behavior.
 \section{Implementation}
 If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stochastic interpretation \cite{blondel2024elementsdifferentiableprogramming}.\\
-We define the set of all possible programs as pairs of $(T, W_H) \in P_H$ where $T$ is an AST representing the computation of the program, and $W_H$ are the parameters such as constants but could be anything. The hard interpreter (HI) can evaluate functions in given a program in $P_H$. We then define $\text{ST} \in P_H \longrightarrow P_S,$ where $(T, W_S) \in P_S$. $P_S$ is the set of all softened programs, where a soft interpreter (SI) can be differentiated with respect to weights $W_S$.\\
+We define the set of all possible programs as pairs of $(T, W_H) \in P_H$ where $T$ is an AST representing the computation graph of the program, and $W_H$ are the parameters such as constants. The hard interpreter (HI) can evaluate functions in given a program in $P_H$. We then define $\text{ST} \in P_H \longrightarrow P_S,$ where $(T, W_S) \in P_S$. $P_S$ is the set of all softened programs, where a soft interpreter (SI) can be differentiated with respect to weights $W_S$.\\
 \paragraph{Loss function} For training, we take a $n$ test cases $f_i(W_s) \mapsto [0, 1]$,  specifications that define correctness conditions. We can then backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors. Our loss function is constructed below.
 \begin{center}
   $\dfrac{1}{n} \sum_1^n 1 - f_i(W_s)$
@@ -57,7 +57,7 @@ The model is defined by three hyperparameters along with program AST $T$, each o
   HI: $a < b \in \{\text{true}, \text{false}\}$\\
   SI: $P(a - b < 0) = \int_{-\infty}^0 (a \star b) (k) dt = \int_{-\infty}^0 \int_{-\infty}^{\infty} \dfrac{1}{\sigma_a \sqrt{\tau}} \dfrac{1}{\sigma_b \sqrt{\tau}} e^{\frac{1}{2}(\frac{k - a}{\sigma_a})^2}e^{\frac{1}{2}(\frac{t-k + b}{\sigma_b})^2} dk dt = \int_{-\infty}^0 \dfrac{1}{\sqrt{\sigma_a^2 + \sigma_b^2} \sqrt{\tau}} e^{\frac{1}{2}\frac{(t - a + b)^2}{\sigma_a^2 + \sigma_b^2}}dt = \Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \in [0, 1]$
 \end{center}
-The Gaussian CDF can then be approximated with a sigmoid function which is easier to calculate. The variance is defined as the model hyperparameter $\sigma_{\text{cmp}}$.
+The Gaussian CDF can then be approximated with a sigmoid function which is closed form. The variance is defined as the model hyperparameter $\sigma_{\text{cmp}}$.
 \begin{center}
   $\Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \approx \sigma(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) = \sigma(a - b, \sigma_{\text{cmp}}) \in [0, 1]$
 \end{center}
@@ -126,22 +126,20 @@ After a model is trained, the SI representation, $P_S$ must be converted back to
 \end{itemize}
 
 \section{Type system}
-Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indices.
+Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indices. Our type system has two types of scalars: soft and hard scalars.
 
-Create two types of scalars: soft and hard scalars.
-
-Because the length of lists are deterministic from a function call, they can be expressed as GADT's parameterized over the natural numbers, which can then be represented as a vector space over elements, assuming the elements form a field. We treat each instantiation of a function with list lengths as seperate but shairing parameters in $W_S$, and can act as if list lengths are hard scalars. Expressions used for fixed lengths for loops must evaluate to hard scalars, otherwise differentiation would be incorrect. Binary operators on both soft and hard scalars evaluate to a soft scalar due to the resulting computation aquiring a gradient.
+Because the length of lists are deterministic from a function call, they can be expressed as GADT's parameterized over the natural numbers, which can then be represented as a vector space over elements, assuming the elements form a field. We treat each instantiation of a function with list lengths as seperate but shairing parameters in $W_S$, and can be evaluated as if list lengths are hard scalars. Expressions used for fixed lengths for loops must evaluate to hard scalars, otherwise differentiation would be incorrect. Binary operators on both soft and hard scalars evaluate to a soft scalar due to the resulting computation aquiring a gradient.
 \section{Control Flow}
-If statements are simply done by doing a linear interpolation between the two branch. The results of each branch must be a vector space over the real numbers for the linear interpolation to work.
+\paragraph{If statments} If statements are simply done by doing a linear interpolation between the two branches. The results of each branch must be a vector space over the real numbers for the linear interpolation to work.
 
 \begin{center}
   HI: $\text{if } \text{true} \text{ then } A \text{ else } B \mapsto A$, $\text{if } \text{false} \text{ then } A \text{ else } B \mapsto B$\\
   SI: $C \in [0, 1], \text{if } C \text{ then } A \text{ else } B \mapsto CA + (1-C)B$
 \end{center}
 
-For loops are restricted to a hard hard scalars number of iterations, and can simply be unrolled into a linear sequence of instructions that can be differentiated normally.
+\paragraph{For loops} For loops are restricted to a hard scalar number of iterations, and can simply be unrolled into a linear sequence of instructions that can be differentiated normally.
 
-Evaluating a while loops can result in a potentially non-terminating computation. Instead we represent the while loop as a Markov chain with each iteration depending on the state of the previous. The chain terminates either after a fixed length number of iterations, or the condition probability goes below a threshold $\theta$. We can do this with an algebraic effect handler.
+\paragraph{While loops} Evaluating a while loops can result in a potentially non-terminating computation. Instead we represent the while loop as a Markov chain with each iteration depending on the state of the previous. The chain terminates either after a fixed length number of iterations, or the condition probability goes below a threshold $\theta$. We can do this with an algebraic effect handler.
 
 \begin{center}
   $\text{while}(\text{state}, \text{condition}, \text{body}, \text{rest of program}) =$\\
@@ -256,7 +254,7 @@ For small programs the number of parameters may be small. We attempted to use a 
   $W_S := W_S - \lambda \nabla L(W_s)$
 \end{center}
 
-, a second order Newtons method will optimize like below.
+a second order Newtons method will optimize with the below algorithm.
 \begin{center}
   $W_S := W_S - \lambda [H_L(W_s)]^{-1} \nabla L(W_s)$
 \end{center}
@@ -273,7 +271,8 @@ While loops are slow. Because it uses an algebraic handler, each iteration of a 
 Another problem is the inaccuracy of while loops. The program below calculates $2^x$, and each iteration of the while loop doubles in size.
 \begin{verbatim}
 [exp2((x : int)) -> int
-  (while (acc, (0, 1)) __not((0 . acc == x)) ((0 . acc + 1), (1 . acc * 2)) 1 . acc)
+  (while (acc, (0, 1)) __not((0 . acc == x))
+         ((0 . acc + 1), (1 . acc * 2)) 1 . acc)
 ];
 \end{verbatim}
 A problem ariseses when the contribution of a while loop grows faster than the conditional decreases each iteration's contribution. This effect heavily biases the while loop towards later iterations, and our framework is unable to correct this program.
