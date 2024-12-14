@@ -26,7 +26,7 @@
 \maketitle
 
 \begin{abstract}
-  We present an approach and implementation for automated program correction given test cases. Our framework, Diffylang, approaches discreet operations as a stoichastic process, representing scalars as gaussian distributions. Each distribution has a mean of the value of the scalar, with the variance as a hyperparameter. This representation allows differentiation of usually discontinious operations, and applying machine learning gradient descent on the program with respect to parameters. In this paper we show training methods, hyperparameter estimation, and results at correction. These methods could potentially have applications in increasing accuraccy of LLM code generation and hash function attacks.
+  We present an approach and implementation for automated program correction given test cases. Our framework, Diffylang, approaches discrete operations as a stochastic process, representing scalars as gaussian distributions. Each distribution has a mean of the value of the scalar, with the variance as a hyperparameter. This representation allows differentiation of usually discontinuous operations, and applying machine learning gradient descent on the program with respect to parameters. In this paper we show training methods, hyperparameter estimation, and results at correction. These methods could potentially have applications in increasing accuracy of LLM code generation and hash function attacks.
 \end{abstract}
 
 \section{Background and Related Work}
@@ -35,17 +35,17 @@
 \paragraph{Automated Program Repair} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes leveraging gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
 
 \section*{Motivation}
-Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behaviour.
+Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behavior.
 \section*{Implementation}
-If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stoichastic interpretation \cite{blondel2024elementsdifferentiableprogramming}.\\
+If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stochastic interpretation \cite{blondel2024elementsdifferentiableprogramming}.\\
 We define the set of all possible programs as pairs of $(T, W_H) \in P_H$ where $T$ is an AST representing the computation of the program, and $W_H$ are the parameters such as constants but could be anything. The hard interpreter (HI) can evaluate functions in given a program in $P_H$. We then define $\text{ST} \in P_H \longrightarrow P_S,$ where $(T, W_S) \in P_S$. $P_S$ is the set of all softened programs, where a soft interpreter (SI) can be differentiated with respect to weights $W_S$.\\
 \paragraph{Loss function} For training, we take a $n$ test cases $f_i(W_s) \mapsto [0, 1]$,  specifications that define correctness conditions. We can then backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors. Our loss function is constructed below.
 \begin{center}
   $\dfrac{1}{n} \sum_1^n 1 - f_i(W_s)$
 \end{center}
 When all test cases reach 1, the loss function will be minimized.
-\subsection*{Stoichastic perspective}
-The model is defined by three hyperparameters along with program AST $T$, each of them is a variance for a stoichastic operation, non-equality comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
+\subsection*{Stochastic perspective}
+The model is defined by three hyperparameters along with program AST $T$, each of them is a variance for a stochastic operation, non-equality comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
 \begin{center}
   $\sigma_{\text{cmp}} \in \mathbb{R}$\\
   $\sigma_{\text{eq}} \in \mathbb{R}$\\
@@ -85,7 +85,7 @@ where the addition is the addition of elements of the vector space.
 \end{itemize}
 
 \subsection*{Hyperparameter optimizations}
-As the three hyperparameter variances approach zero, the SI should approach the HI. We can say that $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} \text{SI}(T_S, W_S) = \text{HI}(T_H, W_H)$. If the variances do reach zero, Gaussians will be equivelent delta functions [ADD REFERENCE HERE], and sigmoids become step functions [ADD REFERENCE HERE] recovering non-equality comparisons, recovering the HI behaviour , though this is impractical with real floating point implementation.
+As the three hyperparameter variances approach zero, the SI should approach the HI. We can say that $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} \text{SI}(T_S, W_S) = \text{HI}(T_H, W_H)$. If the variances do reach zero, Gaussians will be equivalent delta functions [ADD REFERENCE HERE], and sigmoids become step functions [ADD REFERENCE HERE] recovering non-equality comparisons, recovering the HI behavior , though this is impractical with real floating point implementation.
 
 Comparison operators don't scale with program constant size. For example:
 \begin{center}
@@ -105,7 +105,7 @@ For an epoch $i$, we found the below hyperparameter variance decay to train the 
   $\sigma_{\text{eq}} = \text{max}(20000e^{-\frac{i}{300}}, 0.0001)$\\
   $\sigma_{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
 \end{center}
-Due to floating point precision, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behaviour more closeley resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-neglegable derivatives for practical training. 
+Due to floating point precision, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behavior more closely resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-negligible derivatives for practical training. 
 
 %% \section*{idk}
 
@@ -126,7 +126,7 @@ After a model is trained, the SI representation, $P_S$ must be converted back to
 \end{itemize}
 
 \section*{Type system}
-Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indicies.
+Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indices.
 
 Create two types of scalars: soft and hard scalars.
 
@@ -141,7 +141,7 @@ If statements are simply done by doing a linear interpolation between the two br
 
 For loops are restricted to a hard hard scalars number of iterations, and can simply be unrolled into a linear sequence of instructions that can be differentiated normally.
 
-Evaluating a while loops can result in a potentially non-terminating computation. Instead we represent the while loop as a Markov chain with each iteration depending on the state of the previous. The chain terminates either after a fixed length number of iterations, or the condition probabilty goes below a threshold $\theta$. We can do this with an algebreic effect handler.
+Evaluating a while loops can result in a potentially non-terminating computation. Instead we represent the while loop as a Markov chain with each iteration depending on the state of the previous. The chain terminates either after a fixed length number of iterations, or the condition probability goes below a threshold $\theta$. We can do this with an algebraic effect handler.
 
 \begin{center}
   $\text{while}(\text{state}, \text{condition}, \text{body}, \text{rest of program}) =$\\
@@ -152,7 +152,7 @@ Evaluating a while loops can result in a potentially non-terminating computation
 
 \section{Results}
 \begin{minipage}{\textwidth}
-When our framework is tested on a trivially incorrect program comparing numbers it converges to a correct result, and hardens to a program that passes the behaviour, shown by a convergent loss function in \ref{fig:trivial}.
+When our framework is tested on a trivially incorrect program comparing numbers it converges to a correct result, and hardens to a program that passes the behavior, shown by a convergent loss function in \ref{fig:trivial}.
 \begin{verbatim}
 [is_greater_than_2
   ((x : int)) -> bool
@@ -246,7 +246,7 @@ The loss function does not always converge. With this implementation of bubble s
   \begin{center}
     \includegraphics[width=0.5\textwidth]{bubble_sort.png}
   \end{center}
-  \caption{Loss function of a bubble sort algorithm, which fails to converge due to the hyperparameters increasing the loss function faster than gradient descent decreasese it.}
+  \caption{Loss function of a bubble sort algorithm, which fails to converge due to the hyperparameters increasing the loss function faster than gradient descent decreases it.}
   \label{fig:bubble_sort}
 \end{figure}
 \section{Hessian Newtons Method}
@@ -261,16 +261,16 @@ For small programs the number of parameters may be small. We attempted to use a 
   $W_S := W_S - \lambda [H_L(W_s)]^{-1} \nabla L(W_s)$
 \end{center}
 
-We gave up on this approach due to the Hessian matrix being non-invertable in many cases. In the case that the gradient of the loss function with respect to any parameters is zero, an entire column and row of the Hessian matrix will be zero, making in non invertable.
+We gave up on this approach due to the Hessian matrix being non-invertible in many cases. In the case that the gradient of the loss function with respect to any parameters is zero, an entire column and row of the Hessian matrix will be zero, making in non invertable.
 
 \section{Synthetic Data Generation}
-We implemented a perturbation of the AST. By adding a small amount of noise to the model parameters, it can introduce incorrect behaviour that can then be given to the model. Elements of $W_S$ can be modified by a gaussian distribution $W_S + N(0, I)$. This method can allow testing the accuraccy of the model at correcting programs, and finidng cases where it is unable to.
+We implemented a perturbation of the AST. By adding a small amount of noise to the model parameters, it can introduce incorrect behavior that can then be given to the model. Elements of $W_S$ can be modified by a gaussian distribution $W_S + N(0, I)$. This method can allow testing the accuraccy of the model at correcting programs, and finidng cases where it is unable to.
 
 \section{Limitations}
 \subsection*{While loops}
-While loops are slow. Because it uses an algebreic handler, each iteration of a while loop requires runing the entire rest of the program. This method can result in a runtime complexity of up to $O(k^n)$ where $n$ is the number of while loops.
+While loops are slow. Because it uses an algebraic handler, each iteration of a while loop requires runing the entire rest of the program. This method can result in a runtime complexity of up to $O(k^n)$ where $n$ is the number of while loops.
 
-Another problem is the innaccuracy of while loops. The program below calculates $2^x$, and each iteration of the while loop doubles in size.
+Another problem is the inaccuracy of while loops. The program below calculates $2^x$, and each iteration of the while loop doubles in size.
 \begin{verbatim}
 [exp2((x : int)) -> int
   (while (acc, (0, 1)) __not((0 . acc == x)) ((0 . acc + 1), (1 . acc * 2)) 1 . acc)
@@ -283,8 +283,8 @@ This work demonstrates a proof-of-concept for automatically correcting program e
 
 Future work can include:
 \begin{itemize}
-\item \textbf{Performance Optimization:} We ported the parts of the framework to Cuda, but did not result in significant speedup. We belive this to be the lack of large tensor operations, because our model doesn't necessarilly have feed forward networks. We believe speedup can still be achieved with cuda graph computations which can partially compile the computational graph of an instantiation of our model. A multithreaded approch to while loops iterations which are trivially parralelizable, could also be implemented.
-\item \textbf{Hyperparameter Adjustment:} We require more expirementation for different dynamic hyperparameter adjustment. Current exponential decay fails for many of the more complex programs.
+\item \textbf{Performance Optimization:} We ported the parts of the framework to Cuda, but did not result in significant speedup. We believe this to be the lack of large tensor operations, because our model doesn't necessarilly have feed forward networks. We believe speedup can still be achieved with cuda graph computations which can partially compile the computational graph of an instantiation of our model. A multithreaded approach to while loops iterations which are trivially parralelizable, could also be implemented.
+\item \textbf{Hyperparameter Adjustment:} We require more experimentation for different dynamic hyperparameter adjustment. Current exponential decay fails for many of the more complex programs.
 \item \textbf{Comprehensive Evaluation:} We require testing on non-trivial codebases to assess practical utility at a larger scale.
 \end{itemize}
 
