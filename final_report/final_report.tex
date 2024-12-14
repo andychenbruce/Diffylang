@@ -15,9 +15,9 @@
 
 \author{
   Andrew Bruce \\ \href{mailto:acbruce@ucsc.edu}{acbruce@ucsc.edu}
-  \and
+  \And
   Dongjing Wang \\ \href{mailto:dwang114@ucsc.edu}{dwang114@ucsc.edu}
-  \and
+  \And
   Ming Qi \\ \href{mailto:mqi6@ucsc.edu}{mqi6@ucsc.edu}
 }
 
@@ -34,9 +34,9 @@
 
 \paragraph{Automated Program Repair} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes leveraging gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
 
-\section*{Motivation}
+\section{Motivation}
 Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behavior.
-\section*{Implementation}
+\section{Implementation}
 If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stochastic interpretation \cite{blondel2024elementsdifferentiableprogramming}.\\
 We define the set of all possible programs as pairs of $(T, W_H) \in P_H$ where $T$ is an AST representing the computation of the program, and $W_H$ are the parameters such as constants but could be anything. The hard interpreter (HI) can evaluate functions in given a program in $P_H$. We then define $\text{ST} \in P_H \longrightarrow P_S,$ where $(T, W_S) \in P_S$. $P_S$ is the set of all softened programs, where a soft interpreter (SI) can be differentiated with respect to weights $W_S$.\\
 \paragraph{Loss function} For training, we take a $n$ test cases $f_i(W_s) \mapsto [0, 1]$,  specifications that define correctness conditions. We can then backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors. Our loss function is constructed below.
@@ -44,7 +44,7 @@ We define the set of all possible programs as pairs of $(T, W_H) \in P_H$ where 
   $\dfrac{1}{n} \sum_1^n 1 - f_i(W_s)$
 \end{center}
 When all test cases reach 1, the loss function will be minimized.
-\subsection*{Stochastic perspective}
+\subsection{Stochastic perspective}
 The model is defined by three hyperparameters along with program AST $T$, each of them is a variance for a stochastic operation, non-equality comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
 \begin{center}
   $\sigma_{\text{cmp}} \in \mathbb{R}$\\
@@ -84,8 +84,8 @@ where the addition is the addition of elements of the vector space.
   \item Boolean not: $\neg b_1: b_1 \in [0, 1] \mapsto 1 - b_1$\\
 \end{itemize}
 
-\subsection*{Hyperparameter optimizations}
-As the three hyperparameter variances approach zero, the SI should approach the HI. We can say that $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} \text{SI}(T_S, W_S) = \text{HI}(T_H, W_H)$. If the variances do reach zero, Gaussians will be equivalent delta functions [ADD REFERENCE HERE], and sigmoids become step functions [ADD REFERENCE HERE] recovering non-equality comparisons, recovering the HI behavior , though this is impractical with real floating point implementation.
+\subsection{Hyperparameter optimizations}
+As the three hyperparameter variances approach zero, the SI should approach the HI. We can say that $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} \text{SI}(T_S, W_S) = \text{HI}(T_H, W_H)$. If the variances do reach zero, Gaussians will be equivalent delta functions, and sigmoids become step functions recovering non-equality comparisons, recovering the HI behavior , though this is impractical with real floating point implementation.
 
 Comparison operators don't scale with program constant size. For example:
 \begin{center}
@@ -95,7 +95,7 @@ works, but scaling to bigger numbers such as
 \begin{center}
   $f(x) = (1000 == x), \dfrac{\partial f}{\partial x} (2000) \approx 0$\\
 \end{center}
-would usually result in a null derivative with a relatively smaller $\sigma$ as the floating implementation rounds to zero. To deal with problems such as operators not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay.\\
+would usually result in a null derivative with a relatively smaller $\sigma$ as the floating implementation rounds to zero. To deal with problems such as operators not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay \cite{DBLP:journals/corr/abs-1910-07454}.\\
 
 %% ADD REFERENCE https://arxiv.org/pdf/1910.07454
 
@@ -125,7 +125,7 @@ After a model is trained, the SI representation, $P_S$ must be converted back to
     \item \textbf{Integer Hardening:} Our ST changes integers, $\mathbb{Z}$, to real numbers, $\mathbb{R}$. When we harden back to $P_H$, we simply round the real number back to the nearest integer.
 \end{itemize}
 
-\section*{Type system}
+\section{Type system}
 Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indices.
 
 Create two types of scalars: soft and hard scalars.
@@ -267,7 +267,7 @@ We gave up on this approach due to the Hessian matrix being non-invertible in ma
 We implemented a perturbation of the AST. By adding a small amount of noise to the model parameters, it can introduce incorrect behavior that can then be given to the model. Elements of $W_S$ can be modified by a gaussian distribution $W_S + N(0, I)$. This method can allow testing the accuraccy of the model at correcting programs, and finidng cases where it is unable to.
 
 \section{Limitations}
-\subsection*{While loops}
+\subsection{While loops}
 While loops are slow. Because it uses an algebraic handler, each iteration of a while loop requires runing the entire rest of the program. This method can result in a runtime complexity of up to $O(k^n)$ where $n$ is the number of while loops.
 
 Another problem is the inaccuracy of while loops. The program below calculates $2^x$, and each iteration of the while loop doubles in size.
