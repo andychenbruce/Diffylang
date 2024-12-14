@@ -249,47 +249,46 @@ The loss function does not always converge. With this implementation of bubble s
   \caption{Loss function of a bubble sort algorithm, which fails to converge due to the hyperparameters increasing the loss function faster than gradient descent decreasese it.}
   \label{fig:bubble_sort}
 \end{figure}
-\section{Hessian Methods}
-While gradient-based optimizers (e.g., SGD, Adam) are $O(n)$ in the number of parameters, exploring second-order methods like Newton's method can improve convergence. Computing Hessians is $O(n^2)$ and requires complicated analysis, but may speed convergence for small programs. We experimented with computing Hessians directly, though non-differentiability and scaling issues remain challenging.
+\section{Hessian Newtons Method}
+For small programs the number of parameters may be small. We attempted to use a Hessian based machine learning optimization algorithm due to the Hessian being more tractable with its $O(n^2)$ size opposed to gradients $O(n)$ size for small numbers. Opposed to gradient descent below,
 
-\subsection{Markovian While Loops}
-While loops are problematic because their iteration count is not fixed and can be infinite. We approximate while loops as Markov chains, with transition probabilities representing the likelihood of continuing the loop. By limiting the depth of unrolling or relying on probabilistic approximations, we can differentiate through loop constructs. Although infinite loops cannot be fully captured, this approach allows partial differentiability for loops.
+\begin{center}
+  $W_S := W_S - \lambda \nabla L(W_s)$
+\end{center}
 
-\subsection{Differentiable Dictionaries}
-Key-value lookups in dictionaries are inherently discrete. We implement dictionaries as kernel-based lookups over continuous key embeddings. Inspired by self-attention mechanisms, we represent keys as vectors and compute a weighted sum of values based on similarity. This enables differentiability in dictionary operations, albeit with increased computational overhead.
+, a second order Newtons method will optimize like below.
+\begin{center}
+  $W_S := W_S - \lambda [H_L(W_s)]^{-1} \nabla L(W_s)$
+\end{center}
 
-\subsection{Synthetic Data Generation}
-To train and evaluate the framework, we generate synthetic data by perturbing abstract syntax trees (ASTs) of correct programs. This produces incorrect variants and their corresponding test cases. This approach can generate large training sets, facilitating stable training and evaluation of the method’s ability to correct errors.
+We gave up on this approach due to the Hessian matrix being non-invertable in many cases. In the case that the gradient of the loss function with respect to any parameters is zero, an entire column and row of the Hessian matrix will be zero, making in non invertable.
 
+\section{Synthetic Data Generation}
+We implemented a perturbation of the AST. By adding a small amount of noise to the model parameters, it can introduce incorrect behaviour that can then be given to the model. Elements of $W_S$ can be modified by a gaussian distribution $W_S + N(0, I)$. This method can allow testing the accuraccy of the model at correcting programs, and finidng cases where it is unable to.
 
 \section{Limitations}
-Several obstacles remain:
-\begin{itemize}
-    \item \textbf{Hessian Invertability:} ended up giving up on this
-    \item \textbf{While loops are slow:} Infinite loops, variable-length lists, and string keys are difficult to soften. Many data structures must be approximated in restrictive ways.
-    \item \textbf{Scalability:} Gradient computations, especially Hessians, grow quickly in cost. Larger programs may be infeasible to handle with this approach.
-    \item \textbf{CUDA not applicable:} Our neural network doesn't use large tensor optimizations. Usually won't use feed forward networks.
-\end{itemize}
+\subsection*{While loops}
+While loops are slow. Because it uses an algebreic handler, each iteration of a while loop requires runing the entire rest of the program. This method can result in a runtime complexity of up to $O(k^n)$ where $n$ is the number of while loops.
 
-while loops with exponential
+Another problem is the innaccuracy of while loops. The program below calculates $2^x$, and each iteration of the while loop doubles in size.
+\begin{verbatim}
+[exp2((x : int)) -> int
+  (while (acc, (0, 1)) __not((0 . acc == x)) ((0 . acc + 1), (1 . acc * 2)) 1 . acc)
+];
+\end{verbatim}
+A problem ariseses when the contribution of a while loop grows faster than the conditional decreases each iteration's contribution. This effect heavily biases the while loop towards later iterations, and our framework is unable to correct this program.
 
 \section{Conclusion and Future Work}
-This work demonstrates a proof-of-concept for automatically correcting program errors using deep learning optimization methods. By approximating programs as neural networks and defining differentiable substitutes for discrete operations, we open the door to gradient-based program repair.
+This work demonstrates a proof-of-concept for automatically correcting program errors using deep learning optimization methods.
 
-Future directions include:
+Future work can include:
 \begin{itemize}
-    \item \textbf{Performance Optimization:} Use cuda graph compilation computations.
-    \item \textbf{Advanced Optimization Methods:} Improving convergence with second-order methods and more sophisticated meta-optimizers.
-    \item \textbf{Comprehensive Evaluation:} Testing on non-trivial codebases and real-world bugs to assess practical utility.
+\item \textbf{Performance Optimization:} We ported the parts of the framework to Cuda, but did not result in significant speedup. We belive this to be the lack of large tensor operations, because our model doesn't necessarilly have feed forward networks. We believe speedup can still be achieved with cuda graph computations which can partially compile the computational graph of an instantiation of our model. A multithreaded approch to while loops iterations which are trivially parralelizable, could also be implemented.
+\item \textbf{Hyperparameter Adjustment:} We require more expirementation for different dynamic hyperparameter adjustment. Current exponential decay fails for many of the more complex programs.
+\item \textbf{Comprehensive Evaluation:} We require testing on non-trivial codebases to assess practical utility at a larger scale.
 \end{itemize}
-
-Though many challenges remain, our approach represents a step toward integrating neural optimization into software development workflows, potentially reducing debugging effort and improving program reliability.
 
 \bibliographystyle{abbrv}
 \bibliography{refs}
-
-
 \end{document}
-
-
 \documentclass{article}
