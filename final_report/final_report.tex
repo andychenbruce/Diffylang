@@ -30,9 +30,9 @@
 \end{abstract}
 
 \section{Background and Related Work}
-\paragraph{Differentiable Programming} Differentiable programming aims to integrate gradient-based optimization into the software development process, allowing parameters within code to be tuned automatically \cite{blondel2024elementsdifferentiableprogramming,DBLP:journals/corr/abs-1907-07587,vandemeulebroucke2018myia}. Earlier works have explored differentiable interpreters and soft approximations of discrete structures, but significant challenges remain in applying these ideas to general imperative programs.
+\paragraph{Differentiable Programming} Differentiable programming aims to integrate gradient-based optimization into the software development process, allowing the output to be auto-differentiated with respect to program parameters \cite{blondel2024elementsdifferentiableprogramming,DBLP:journals/corr/abs-1907-07587,vandemeulebroucke2018myia}. Earlier works have explored differentiable interpreters and soft approximations of discrete structures, but significant challenges remain in applying these ideas to general imperative programs \cite{Considine_Kotlin_A_Shape-Safe_2019}.
 
-\paragraph{Automated Program Repair} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes leveraging gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
+\paragraph{Automated Program Repair} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
 
 \section{Motivation}
 Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behavior.
