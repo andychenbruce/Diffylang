@@ -10,6 +10,7 @@
 \usepackage{nicefrac}
 \usepackage{microtype}
 \usepackage{xcolor}
+\usepackage{graphicx}
 \title{Approximating Programs as Neural Networks for Automated Correction}
 
 \author{
@@ -25,21 +26,32 @@
 \maketitle
 
 \begin{abstract}
-  We present an approach for automated program correction given test cases. Our framework approaches discreet operations as a stoichastic process, representing scalars as gaussian distributions. Each distribution has a mean of the value of the scalar, with the variance as a hyperparameter. This representation allows differentiation of usually discontinious operations, and applying machine learning gradient descent on the program with respect to parameters. In this paper we show training methods, hyperparameter estimation, and results at correction. These methods could potentially have applications in increasing accuraccy of LLM code generation and hash function attacks.
+  We present an approach and implementation for automated program correction given test cases. Our framework, Diffylang, approaches discreet operations as a stoichastic process, representing scalars as gaussian distributions. Each distribution has a mean of the value of the scalar, with the variance as a hyperparameter. This representation allows differentiation of usually discontinious operations, and applying machine learning gradient descent on the program with respect to parameters. In this paper we show training methods, hyperparameter estimation, and results at correction. These methods could potentially have applications in increasing accuraccy of LLM code generation and hash function attacks.
 \end{abstract}
+
+\section{Background and Related Work}
+\paragraph{Differentiable Programming} Differentiable programming aims to integrate gradient-based optimization into the software development process, allowing parameters within code to be tuned automatically \cite{blondel2024elementsdifferentiableprogramming,DBLP:journals/corr/abs-1907-07587,vandemeulebroucke2018myia}. Earlier works have explored differentiable interpreters and soft approximations of discrete structures, but significant challenges remain in applying these ideas to general imperative programs.
+
+\paragraph{Automated Program Repair} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes leveraging gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
 
 \section*{Motivation}
 Debugging and correcting software errors can be both time-consuming and error-prone. Traditional automated repair tools rely on static analysis, fuzzing, and constraint solving. We aimed to create a system which fits a codebase to a set of user defined behaviour.
-\section*{Methods}
-If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stoichastic interpretation \cite{blondel2024elementsdifferentiableprogramming}. For training, we take a set of test cases or specifications that define correctness conditions, we can backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors.
+\section*{Implementation}
+If we can apply a softening transformation (ST) to discrete operations in code (conditionals, integer operations, list indexing indexing) into a differential approximation, then the program itself can be turned into a neural network. We do this with a stoichastic interpretation \cite{blondel2024elementsdifferentiableprogramming}.\\
+We define the set of all possible programs as pairs of $(T, W_H) \in P_H$ where $T$ is an AST representing the computation of the program, and $W_H$ are the parameters such as constants but could be anything. The hard interpreter (HI) can evaluate functions in given a program in $P_H$. We then define $\text{ST} \in P_H \longrightarrow P_S,$ where $(T, W_S) \in P_S$. $P_S$ is the set of all softened programs, where a soft interpreter (SI) can be differentiated with respect to weights $W_S$.\\
+\paragraph{Loss function} For training, we take a $n$ test cases $f_i(W_s) \mapsto [0, 1]$,  specifications that define correctness conditions. We can then backpropagate from a loss function representing deviation from correct behavior. We hope that machine learning methods can correct errors. Our loss function is constructed below.
+\begin{center}
+  $\dfrac{1}{n} \sum_1^n 1 - f_i(W_s)$
+\end{center}
+When all test cases reach 1, the loss function will be minimized.
 \subsection*{Stoichastic perspective}
-The model is defined by 3 hyperparameters along with program AST $T$, each of them is a variance for a stoichastic operation, non-equality comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
+The model is defined by three hyperparameters along with program AST $T$, each of them is a variance for a stoichastic operation, non-equality comparisons, equality, and list indexing as $\sigma_{\text{cmp}}$, $\sigma_{\text{eq}}$, and $\sigma_{\text{list}}$ respectivley.
 \begin{center}
   $\sigma_{\text{cmp}} \in \mathbb{R}$\\
   $\sigma_{\text{eq}} \in \mathbb{R}$\\
   $\sigma_{\text{list}} \in \mathbb{R}$
 \end{center}
-Cumulative comparison operations can be calculated with a convolution over the probability distributions of 2 scalars. With 2 scalars $a$ and $b$ with variances $\sigma_a$ and $\sigma_b$ we can defined softening transformations. With $\Psi$ as the Gaussian CDF, the less than operator ST can be defined as below.
+\paragraph{Non-equality comparisons} Non-equality comparison operations can be calculated with a convolution over the probability distributions of 2 scalars. With 2 scalars $a$ and $b$ with variances $\sigma_a$ and $\sigma_b$ we can defined softening transformations. With $\Psi$ as the Gaussian CDF, the less than operator ST can be defined as below.
 
 \begin{center}
   HI: $a < b \in \{\text{true}, \text{false}\}$\\
@@ -49,7 +61,7 @@ The Gaussian CDF can then be approximated with a sigmoid function which is easie
 \begin{center}
   $\Psi(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) \approx \sigma(a - b, \sqrt{\sigma_a^2 + \sigma_b^2}) = \sigma(a - b, \sigma_{\text{cmp}}) \in [0, 1]$
 \end{center}
-For equality we use the inner product as a similarity function, and then normalize to keep the values between 0 and 1 for booleans. Given some inner space $(F, \langle \cdot, \cdot \rangle)$ and a kernel function $\phi$ we can define the ST for equality to be
+\paragraph{Equality} For equality we use the inner product as a similarity function, and then normalize to keep the values between 0 and 1 for booleans. Given some inner space $(F, \langle \cdot, \cdot \rangle)$ and a kernel function $\phi$ we can define the ST for equality to be
 \begin{center}
   HI: $(a == b) \in \{\text{true}, \text{false}\}$\\
   DI: $(a == b) = \dfrac{\langle \phi(a), \phi(b) \rangle}{\sqrt{\langle \phi(a), \phi(a) \rangle \langle \phi(b), \phi(b) \rangle}} \in [0, 1]$
@@ -58,26 +70,32 @@ where the kernel function is defined as a convolution as such that
 \begin{center}
   $\langle \phi(a), \phi(b) \rangle = \int_{-\infty}^{\infty} \dfrac{1}{\sigma_a \sqrt{\tau}} \dfrac{1}{\sigma_b \sqrt{\tau}} e^{\frac{1}{2}(\frac{k - a}{\sigma_a})^2}e^{\frac{1}{2}(\frac{-k - b}{\sigma_b})^2} dk = \dfrac{1}{\sigma_{\text{eq}} \sqrt{\tau}} e^{\frac{1}{2}(\frac{a - b}{\sigma_{\text{eq}}})^2}$.
 \end{center}
-
-
-The ST for list indexing is a weighted distribution over the index's Gaussian distribution. This method is defined for any vector space $N$ over the field $(\mathbb{R}, *, +)$. The distribution's variance is parameterized by the hyperparameter $\sigma_{\text{list}}$. With a list $l$ of elements $\in N$, and an index $a \in \mathbb{R}$ we define the ST to be
+The hyperparameter $\sigma_{\text{eq}} = \sqrt{\sigma_a^2 + \sigma_b^2}$.
+\paragraph{Indexing} The ST for list indexing is a weighted distribution over the index's Gaussian distribution. This method is defined for any vector space $N$ over the field $(\mathbb{R}, *, +)$. The distribution's variance is parameterized by the hyperparameter $\sigma_{\text{list}}$. With a list $l$ of elements $\in N$, and an index $a \in \mathbb{R}$ we define the ST to be
 \begin{center}
   HI: $l[a] \in N$\\
   DI: $l[a] = \Psi(-\infty, \frac{1}{2}, \sigma_{\text{list}}) + \sum_1^{i-2}\Psi(a-\frac{1}{2}, a+\frac{1}{2}, \sigma_{\text{list}}) + \Psi(i - 1 - \frac{1}{2}, \infty, \sigma_{\text{list}})$
 \end{center}
 where the addition is the addition of elements of the vector space.
+\paragraph{Boolean} We implement these three logically complete boolean operations:
+\begin{itemize}
+  \item Boolean and: $(b_1 \land b_2): b_1, b_2 \in [0, 1] \mapsto b_1 * b_2$
+  \item Boolean or: $(b_1 \lor b_2): b_1, b_2 \in [0, 1] \mapsto b_1 + b_2 - (b_1 \land b_2)$
+  \item Boolean not: $\neg b_1: b_1 \in [0, 1] \mapsto 1 - b_1$\\
+\end{itemize}
+
 \subsection*{Hyperparameter optimizations}
-As the three hyperparameter variances approach zero, the SI, the ST of a program, should approach the HI. We can say that $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} SI(T) = HI(T)$. If the variances do reach zero, Gaussians will be equivelent delta functions [ADD REFERENCE HERE], and sigmoids become step functions [ADD REFERENCE HERE] recovering non-equality comparisons, recovering the HI behaviour , though this is impractical with real floating point implementation.
+As the three hyperparameter variances approach zero, the SI should approach the HI. We can say that $\lim_{\sigma_{\text{cmp}}, \sigma_{\text{eq}}, \sigma_{\text{list}} \rightarrow 0} \text{SI}(T_S, W_S) = \text{HI}(T_H, W_H)$. If the variances do reach zero, Gaussians will be equivelent delta functions [ADD REFERENCE HERE], and sigmoids become step functions [ADD REFERENCE HERE] recovering non-equality comparisons, recovering the HI behaviour , though this is impractical with real floating point implementation.
 
 Comparison operators don't scale with program constant size. For example:
 \begin{center}
   $g(x) = (1 == x), \dfrac{\partial g}{\partial x} (2) > 0$
 \end{center}
-works, but scaling to bigger numbers
+works, but scaling to bigger numbers such as
 \begin{center}
   $f(x) = (1000 == x), \dfrac{\partial f}{\partial x} (2000) \approx 0$\\
 \end{center}
-would usually result in a null derivative as the floating implementation rounds to zero. To deal with problems such as operators not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay.\\
+would usually result in a null derivative with a relatively smaller $\sigma$ as the floating implementation rounds to zero. To deal with problems such as operators not scaling with program constant sizes we start with the hyperparameter variances, high and decrease them towards zero each epoch. This approach towards zero is done with an exponential decay.\\
 
 %% ADD REFERENCE https://arxiv.org/pdf/1910.07454
 
@@ -88,14 +106,6 @@ For an epoch $i$, we found the below hyperparameter variance decay to train the 
   $\sigma_{\text{cmp}} = \text{max}(e^{-\frac{i}{300}}, 0.0001)$\\
 \end{center}
 Due to floating point precision, a lower bound clamping is necessary to avoid zero derivatives and division by zeros at higher gradients. This decay set is so that at higher epochs the SI's behaviour more closeley resembles that as the HI, but at low epochs still allows the derivatives of far off comparisons, equalities, and indexes to have non-neglegable derivatives for practical training. 
-
-\section*{Type system}
-Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indicies.
-
-Create two types of scalars: soft and hard scalars.
-
-Because the length of lists are deterministic from a function call, they can be expressed as GADT's parameterized over the natural numbers, which can then be represented as a vector space over elements, assuming the elements form a field.
-
 
 %% \section*{idk}
 
@@ -108,50 +118,106 @@ Because the length of lists are deterministic from a function call, they can be 
 %% \item An evaluation showing the feasibility of correcting simple program errors through gradient-based updates.
 %% \end{itemize}
 
-\section{Background and Related Work}
-\paragraph{Differentiable Programming} Differentiable programming aims to integrate gradient-based optimization into the software development process, allowing parameters within code to be tuned automatically \cite{blondel2024elementsdifferentiableprogramming,DBLP:journals/corr/abs-1907-07587,vandemeulebroucke2018myia}. Earlier works have explored differentiable interpreters and soft approximations of discrete structures, but significant challenges remain in applying these ideas to general imperative programs.
-
-\paragraph{Automated Program Repair} Existing automated repair techniques often rely on search strategies or constraint-based methods. These approaches lack a direct gradient signal and often struggle to handle large search spaces efficiently. Our method proposes leveraging gradient-based optimization to guide corrections, potentially converging faster in parameterized programs.
-
-\section{Methodology}
-\subsection{Auto-Differentiation Framework and Custom Type System}
-To apply deep learning techniques, we must convert programs into a form amenable to backpropagation. We implement an auto-differentiation framework that operates on an intermediate representation of the code, modeled as a computational graph. This involves:
-
 \subsection{Hardening Code}
-After a model is trained, the SI representation must be converted back to a HI representation.
+After a model is trained, the SI representation, $P_S$ must be converted back to a HI representation, $P_H$.
 \begin{itemize}
-    \item \textbf{Boolean Softening:} A boolean condition is replaced by a continuous probability (e.g., via a sigmoid function). Thus, `if (x > 2)` becomes `if (sigmoid(x - 2))`.
-    \item \textbf{Integer Softening:} Integers can be represented by real numbers. For indexing, we may represent indices as Gaussian distributions over array positions, enabling differentiable approximations of discrete indexing.
+    \item \textbf{Boolean Hardening:} A boolean condition is replaced by a probability $\{\text{true}, \text{false} \} \longrightarrow [0, 1]$. For hardening we threshold at 0.5 to map back to either the hard booleans' true or false.
+    \item \textbf{Integer Hardening:} Our ST changes integers, $\mathbb{Z}$, to real numbers, $\mathbb{R}$. When we harden back to $P_H$, we simply round the real number back to the nearest integer.
 \end{itemize}
 
-After optimization converges, a ``hardening'' step maps these differentiable approximations back to discrete values. For booleans, we choose the nearest discrete value (e.g., thresholding at 0.5). For integers, we round to the nearest integer. This final hardening step returns the modified program to a standard executable form.
+\section*{Type system}
+Our autodifferentiation framework isn't able to differentiate through everything, such as different lengths of lists and for loop indicies.
 
-\subsection{Dynamic Loss Function Generation}
-The loss function is derived from user-provided test cases that specify correct program behavior. Each test case provides input-output pairs, and the difference between the program's soft output and the expected output defines a loss. We aggregate losses over all test cases, and the optimization process attempts to minimize this aggregated loss.
+Create two types of scalars: soft and hard scalars.
 
-As the model trains, continuous values that represent conditions or parameters in the code adjust to reduce loss. When the loss approaches zero, the softened approximation aligns closely with the target specification. However, due to approximation and non-smoothness, zero loss does not guarantee perfect discrete correctness.
+Because the length of lists are deterministic from a function call, they can be expressed as GADT's parameterized over the natural numbers, which can then be represented as a vector space over elements, assuming the elements form a field. We treat each instantiation of a function with list lengths as seperate but shairing parameters in $W_S$, and can act as if list lengths are hard scalars. Expressions used for fixed lengths for loops must evaluate to hard scalars, otherwise differentiation would be incorrect. Binary operators on both soft and hard scalars evaluate to a soft scalar due to the resulting computation aquiring a gradient.
+\section{Control Flow}
+If statements are simply done by doing a linear interpolation between the two branch. The results of each branch must be a vector space over the real numbers for the linear interpolation to work.
 
-\section{Advanced Techniques}
+\begin{center}
+  HI: $\text{if } \text{true} \text{ then } A \text{ else } B \mapsto A$, $\text{if } \text{false} \text{ then } A \text{ else } B \mapsto B$\\
+  SI: $C \in [0, 1], \text{if } C \text{ then } A \text{ else } B \mapsto CA + (1-C)B$
+\end{center}
 
-\subsection{Hessian Methods}
-While gradient-based optimizers (e.g., SGD, Adam) are $O(n)$ in the number of parameters, exploring second-order methods like Newton's method can improve convergence. Computing Hessians is $O(n^2)$ and requires complicated analysis, but may speed convergence for small programs. We experimented with computing Hessians directly, though non-differentiability and scaling issues remain challenging.
+For loops are restricted to a hard hard scalars number of iterations, and can simply be unrolled into a linear sequence of instructions that can be differentiated normally.
 
-\subsection{Markovian While Loops}
-While loops are problematic because their iteration count is not fixed and can be infinite. We approximate while loops as Markov chains, with transition probabilities representing the likelihood of continuing the loop. By limiting the depth of unrolling or relying on probabilistic approximations, we can differentiate through loop constructs. Although infinite loops cannot be fully captured, this approach allows partial differentiability for loops.
+Evaluating a while loops can result in a potentially non-terminating computation. Instead we represent the while loop as a Markov chain with each iteration depending on the state of the previous. The chain terminates either after a fixed length number of iterations, or the condition probabilty goes below a threshold $\theta$. We can do this with an algebreic effect handler.
 
-\subsection{Differentiable Dictionaries}
-Key-value lookups in dictionaries are inherently discrete. We implement dictionaries as kernel-based lookups over continuous key embeddings. Inspired by self-attention mechanisms, we represent keys as vectors and compute a weighted sum of values based on similarity. This enables differentiability in dictionary operations, albeit with increased computational overhead.
-
-\subsection{Synthetic Data Generation}
-To train and evaluate the framework, we generate synthetic data by perturbing abstract syntax trees (ASTs) of correct programs. This produces incorrect variants and their corresponding test cases. This approach can generate large training sets, facilitating stable training and evaluation of the method’s ability to correct errors.
+\begin{center}
+  $\text{while}(\text{state}, \text{condition}, \text{body}, \text{rest of program}) =$\\
+  $\text{if}(\text{condition}(\text{state}) > \theta) \text{ then }$\\
+  $\text{condition}(\text{state}) * \text{while}(\text{body}(\text{state}), \text{condition}, text{body}, \text{rest of program}) + (1 - \text{condition}(\text{state}))(\text{rest of program}(\text{state}))$\\
+  $\text{ else } \text{condition}(\text{state}))(\text{rest of program}(\text{state}))$
+\end{center}
 
 \section{Results}
-We implemented our framework and tested it on various programs.
+\begin{minipage}{\textwidth}
+When our framework is tested on a trivially incorrect program comparing numbers it converges to a correct result, and hardens to a program that passes the behaviour, shown by a convergent loss function in \ref{fig:trivial}.
+\begin{verbatim}
+[is_greater_than_2
+  ((x : int)) -> bool
+  ((x > 4))];
+[const_num () -> int
+  (3)];
 
-We have been able to correct arbitrary index offsets of lists.
 
-INSERT graph HERE
+{is_greater_than_2(3)};
+{!is_greater_than_2(2)};
+{!is_greater_than_2(1)};
+{is_greater_than_2(const_num())};
+\end{verbatim}
+\end{minipage}
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[width=0.5\textwidth]{trivial.png}
+  \end{center}
+  \caption{Loss function of a basic comparison correction.}
+  \label{fig:trivial}
+\end{figure}
 
+\begin{minipage}{\textwidth}
+We also have found convergence for basic list convergences \ref{fig:list_index} with an incorrect index.
+\begin{verbatim}
+[index_list_wrong_1
+((l : list), (x : int)) -> int
+(__index(l, (x + 1)))];
+
+{(index_list_wrong_1({int ; 0, 100, 20, 0, 0, 30, 0}, 1) == 100)};
+\end{verbatim}
+\end{minipage}
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[width=0.5\textwidth]{list_index.png}
+  \end{center}
+  \caption{Loss function of a basic list index.}
+  \label{fig:list_index}
+\end{figure}
+
+
+\begin{minipage}{\textwidth}
+A basic for loop that computes $x^3$ also converges to a correct solution with an error in the input of the function \ref{fig:for_loop}.
+
+\begin{verbatim}
+[pow3((x : int)) -> int
+  (fold [0, 3] (acc, 1) (acc * x))
+];
+
+[test_case1() -> bool
+  ((pow3(1) == 8))
+];
+
+{test_case1()}
+\end{verbatim}
+\end{minipage}
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[width=0.5\textwidth]{for_loop.png}
+  \end{center}
+  \caption{Loss function of a for loop calculating $x^3$.}
+  \label{fig:for_loop}
+\end{figure}\\\\\\\\\\\\
+\begin{minipage}{\textwidth}
+The loss function does not always converge. With this implementation of bubble sort with an incorrect index. The convergence of the hyperparameters increases the loss faster than the gradient descent can adjust \ref{fig:bubble_sort}.
 \begin{verbatim}
 [bubble_sort_pass ((l : list)) -> list
   (fold [0, (__len(l) - 1)] (acc, (l, 0, false))
@@ -175,8 +241,26 @@ INSERT graph HERE
   (__set_index(__set_index(l, index_1, val_1), index_2, val_2))
 ];
 \end{verbatim}
+\end{minipage}
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[width=0.5\textwidth]{bubble_sort.png}
+  \end{center}
+  \caption{Loss function of a bubble sort algorithm, which fails to converge due to the hyperparameters increasing the loss function faster than gradient descent decreasese it.}
+  \label{fig:bubble_sort}
+\end{figure}
+\section{Hessian Methods}
+While gradient-based optimizers (e.g., SGD, Adam) are $O(n)$ in the number of parameters, exploring second-order methods like Newton's method can improve convergence. Computing Hessians is $O(n^2)$ and requires complicated analysis, but may speed convergence for small programs. We experimented with computing Hessians directly, though non-differentiability and scaling issues remain challenging.
 
-BUBBLE SORT loss graph here
+\subsection{Markovian While Loops}
+While loops are problematic because their iteration count is not fixed and can be infinite. We approximate while loops as Markov chains, with transition probabilities representing the likelihood of continuing the loop. By limiting the depth of unrolling or relying on probabilistic approximations, we can differentiate through loop constructs. Although infinite loops cannot be fully captured, this approach allows partial differentiability for loops.
+
+\subsection{Differentiable Dictionaries}
+Key-value lookups in dictionaries are inherently discrete. We implement dictionaries as kernel-based lookups over continuous key embeddings. Inspired by self-attention mechanisms, we represent keys as vectors and compute a weighted sum of values based on similarity. This enables differentiability in dictionary operations, albeit with increased computational overhead.
+
+\subsection{Synthetic Data Generation}
+To train and evaluate the framework, we generate synthetic data by perturbing abstract syntax trees (ASTs) of correct programs. This produces incorrect variants and their corresponding test cases. This approach can generate large training sets, facilitating stable training and evaluation of the method’s ability to correct errors.
+
 
 \section{Limitations}
 Several obstacles remain:
