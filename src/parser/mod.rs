@@ -174,7 +174,105 @@ pub fn parse_expr(token_tree: &TokenTree) -> Result<Expression, &'static str> {
             TokenNonParen::If => Err("idk"),
             TokenNonParen::Let => Err("bruh"),
         },
-        TokenTree::Branch(_) => todo!(),
+        TokenTree::Branch(sub_trees) => {
+            let first = sub_trees.get(0).ok_or("expr missing first")?;
+            match first {
+                TokenTree::Leaf(token_non_paren) => {
+                    match token_non_paren {
+                        TokenNonParen::Name(func_name) => {
+
+                            let args = sub_trees[1..].iter().map(parse_expr).collect::<Result<Vec<_>, _>>()?;
+                            Ok(Expression::FunctionApplication{
+                                func_name: func_name.clone(),
+                                args
+                            })
+                        }
+                        TokenNonParen::Defun => todo!(),
+                        TokenNonParen::Colon => todo!(),
+                        TokenNonParen::Fold => {
+                            let iter_val =
+                                parse_expr(sub_trees.get(1).ok_or("fold loop missing iterator")?)?;
+                            let accumulator = parse_accumulator(
+                                sub_trees.get(2).ok_or("fold loop missing accumulator")?,
+                            )?;
+                            let body = parse_expr(
+                                sub_trees.get(2).ok_or("fold loop missing accumulator")?,
+                            )?;
+                            Ok(Expression::FoldLoop {
+                                iter_val: Box::new(iter_val),
+                                accumulator,
+                                body: Box::new(body),
+                            })
+                        }
+                        TokenNonParen::If => {
+                            let boolean_expr =
+                                parse_expr(sub_trees.get(1).ok_or("if expr missing conditional")?)?;
+                            let true_branch =
+                                parse_expr(sub_trees.get(2).ok_or("if expr missing true branch")?)?;
+                            let false_branch = parse_expr(
+                                sub_trees.get(3).ok_or("if expr missing false branch")?,
+                            )?;
+
+                            Ok(Expression::IfThenElse {
+                                boolean: Box::new(boolean_expr),
+                                true_expr: Box::new(true_branch),
+                                false_expr: Box::new(false_branch),
+                            })
+                        }
+                        TokenNonParen::Let => {
+                            let let_bindings: Vec<LetBind> = parse_let_bindings(
+                                sub_trees.get(1).ok_or("let bindings missing bindings")?,
+                            )?;
+                            let inner: Expression =
+                                parse_expr(sub_trees.get(2).ok_or("let bindings missing body")?)?;
+
+                            Ok(Expression::LetBinds {
+                                bindings: let_bindings,
+                                inner: Box::new(inner),
+                            })
+                        }
+                    }
+                }
+                TokenTree::Branch(_) => todo!(),
+            }
+        }
+    }
+}
+
+pub fn parse_let_bindings(token_tree: &TokenTree) -> Result<Vec<LetBind>, &'static str> {
+    match token_tree {
+        TokenTree::Leaf(_) => todo!(),
+        TokenTree::Branch(vec) => vec.into_iter().map(parse_let_binding).collect(),
+    }
+}
+
+pub fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, &'static str> {
+    match token_tree {
+        TokenTree::Leaf(_) => todo!(),
+        TokenTree::Branch(vec) => {
+            let name = parse_name(vec.get(0).ok_or("let binding missing name")?)?;
+            let body = parse_expr(vec.get(1).ok_or("let binding missing body")?)?;
+
+            return Ok(LetBind {
+                name,
+                value: Box::new(body),
+            });
+        }
+    }
+}
+
+pub fn parse_accumulator(token_tree: &TokenTree) -> Result<FoldAccumulator, &'static str> {
+    match token_tree {
+        TokenTree::Leaf(_) => todo!(),
+        TokenTree::Branch(vec) => {
+            let name = parse_name(vec.get(0).ok_or("acc binding missing name")?)?;
+            let body = parse_expr(vec.get(1).ok_or("acc binding missing body")?)?;
+
+            return Ok(FoldAccumulator {
+                name,
+                initial_expression: Box::new(body),
+            });
+        }
     }
 }
 
@@ -253,7 +351,7 @@ pub enum Expression {
 
     ListLit(ListInner),
     FoldLoop {
-        iter_val: FoldIter,
+        iter_val: Box<Expression>,
         accumulator: FoldAccumulator,
         body: Box<Expression>,
     },
@@ -288,7 +386,7 @@ pub enum Expression {
 
     Not(Box<Expression>),
 
-    ExprWhere {
+    LetBinds {
         bindings: Vec<LetBind>,
         inner: Box<Expression>,
     },
@@ -310,18 +408,6 @@ pub enum Expression {
 pub struct FoldAccumulator {
     pub name: String,
     pub initial_expression: Box<Expression>,
-}
-
-#[derive(Clone, Debug)]
-pub enum FoldIter {
-    Range(FoldRange),
-    ListExpr(Box<Expression>),
-}
-
-#[derive(Clone, Debug)]
-pub struct FoldRange {
-    pub start: Box<Expression>,
-    pub end: Box<Expression>,
 }
 
 #[derive(Clone, Debug)]

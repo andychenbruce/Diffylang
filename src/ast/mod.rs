@@ -85,7 +85,7 @@ pub enum Expression<IntType, FloatType, BoolType, HardType> {
         false_expr: Box<Expression<IntType, FloatType, BoolType, HardType>>,
     },
     FoldLoop {
-        fold_iter: Box<FoldIter<IntType, FloatType, BoolType, HardType>>,
+        fold_iter: Box<Expression<IntType, FloatType, BoolType, HardType>>,
         accumulator: (
             Identifier,
             Box<Expression<IntType, FloatType, BoolType, HardType>>,
@@ -101,15 +101,6 @@ pub enum Expression<IntType, FloatType, BoolType, HardType> {
         body: Box<Expression<IntType, FloatType, BoolType, HardType>>,
         exit_body: Box<Expression<IntType, FloatType, BoolType, HardType>>,
     },
-}
-
-#[derive(serde::Serialize, Clone)]
-pub enum FoldIter<IntType, FloatType, BoolType, HardType> {
-    ExprList(Expression<IntType, FloatType, BoolType, HardType>),
-    Range(
-        Expression<IntType, FloatType, BoolType, HardType>,
-        Expression<IntType, FloatType, BoolType, HardType>,
-    ),
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -374,7 +365,7 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
                     .collect(),
             }
         }
-        crate::parser::Expression::ExprWhere {
+        crate::parser::Expression::LetBinds {
             bindings,
             inner,
         } => {
@@ -407,17 +398,13 @@ fn make_expression<IntType, FloatType, BoolType, HardType>(
             iter_val,
         } => {
             
-            let fold_iter = match iter_val {
-                crate::parser::FoldIter::Range(range) => {
-                    FoldIter::Range(
-                        make_expression(state, funcs, *range.start, false),
-                        make_expression(state, funcs, *range.end, false),
-                    )
-                }
-                crate::parser::FoldIter::ListExpr(expr) => {
-                    FoldIter::ExprList(make_expression(state, funcs, *expr, differentiable))
-                }
-            };
+            let fold_iter =make_expression(
+                state,
+                funcs,
+                *iter_val,
+                differentiable,
+            );
+
             Expression::FoldLoop {
                 accumulator: (
                     Identifier(accumulator.name.to_string()),

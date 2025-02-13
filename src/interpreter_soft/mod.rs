@@ -184,15 +184,7 @@ fn apply_gradient_expr(
             accumulator,
             body,
         } => {
-            match fold_iter.as_mut() {
-                ast::FoldIter::ExprList(ref mut l) => {
-                    apply_gradient_expr(l, grad);
-                }
-                ast::FoldIter::Range(ref mut start, ref mut end) => {
-                    apply_gradient_expr(start, grad);
-                    apply_gradient_expr(end, grad);
-                }
-            }
+            apply_gradient_expr(fold_iter, grad);
             apply_gradient_expr(accumulator.1.as_mut(), grad);
             apply_gradient_expr(body, grad);
         }

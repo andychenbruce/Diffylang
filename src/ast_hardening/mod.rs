@@ -80,16 +80,7 @@ fn harden_expr(
             accumulator,
             body,
         } => crate::ast::Expression::FoldLoop {
-            fold_iter: {
-                match *fold_iter {
-                    crate::ast::FoldIter::ExprList(l) => {
-                        Box::new(crate::ast::FoldIter::ExprList(harden_expr(l)))
-                    }
-                    crate::ast::FoldIter::Range(start, end) => Box::new(
-                        crate::ast::FoldIter::Range(harden_expr(start), harden_expr(end)),
-                    ),
-                }
-            },
+            fold_iter: Box::new(harden_expr(*fold_iter)),
             accumulator: (accumulator.0, Box::new(harden_expr(*accumulator.1))),
             body: Box::new(harden_expr(*body)),
         },

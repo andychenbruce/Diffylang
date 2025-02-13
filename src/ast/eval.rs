@@ -108,7 +108,7 @@ impl<
         var_name: &super::Identifier,
     ) -> EvalVal<IntType, FloatType, BoolType, HardType> {
         match self {
-            EnvVars::End => unreachable!(),
+            EnvVars::End => unreachable!("couldn't find var {:?}", var_name),
             EnvVars::Rest { first, rest } => {
                 if first.0 == *var_name {
                     first.1.clone()
@@ -332,42 +332,21 @@ where
             accumulator,
             body,
         } => {
-            let iter = match **fold_iter {
-                super::FoldIter::Range(ref start, ref end) => {
-                    let start = match eval::<IntType, FloatType, BoolType, HardType, E>(
-                        evaluator,
-                        env.clone(),
-                        start,
-                    ) {
-                        EvalVal::Hard(x) => x,
-                        _ => unreachable!(),
-                    };
-
-                    let end = match eval::<IntType, FloatType, BoolType, HardType, E>(
-                        evaluator,
-                        env.clone(),
-                        end,
-                    ) {
-                        EvalVal::Hard(x) => x,
-                        _ => unreachable!(),
-                    };
-
-                    evaluator
-                        .make_range(start, end, env.program.num_ids)
-                        .into_iter()
-                        .map(|x| EvalVal::Int(x))
-                        .collect()
-                }
-                super::FoldIter::ExprList(ref list) => {
-                    match eval::<IntType, FloatType, BoolType, HardType, E>(
-                        evaluator,
-                        env.clone(),
-                        list,
-                    ) {
-                        EvalVal::List(l) => l,
-                        _ => unreachable!(),
-                    }
-                }
+            let fold_iter_val = eval::<IntType, FloatType, BoolType, HardType, E>(
+                evaluator,
+                env.clone(),
+                &fold_iter
+            );
+            
+            let iter = match fold_iter_val {
+                EvalVal::Int(_) => todo!(),
+                EvalVal::Float(_) => todo!(),
+                EvalVal::Bool(_) => todo!(),
+                EvalVal::Hard(_) => todo!(),
+                EvalVal::List(vec) => {
+                    vec
+                },
+                EvalVal::Product(_) => todo!(),
             };
             iter.into_iter().fold(
                 eval::<IntType, FloatType, BoolType, HardType, E>(
