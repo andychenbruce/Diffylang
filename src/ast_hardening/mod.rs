@@ -33,8 +33,8 @@ fn harden_expr(
     expr: crate::ast::Expression<SoftInt, SoftFloat, SoftBool, i64>,
 ) -> crate::ast::Expression<i64, f64, bool, i64> {
     match expr {
-        crate::ast::Expression::Variable { ident, span } => {
-            crate::ast::Expression::Variable { ident, span }
+        crate::ast::Expression::Variable { ident } => {
+            crate::ast::Expression::Variable { ident }
         }
         crate::ast::Expression::HardInt(x) => crate::ast::Expression::HardInt(x),
         crate::ast::Expression::Integer(x, n) => {
@@ -50,11 +50,9 @@ fn harden_expr(
         crate::ast::Expression::FuncApplication {
             func_name,
             args,
-            span,
         } => crate::ast::Expression::FuncApplication {
             func_name,
             args: args.into_iter().map(harden_expr).collect(),
-            span,
         },
         crate::ast::Expression::ExprWhere { bindings, inner } => {
             crate::ast::Expression::ExprWhere {

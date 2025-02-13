@@ -135,7 +135,7 @@ where
     E: Evaluator<IntType, FloatType, BoolType, HardType>,
 {
     match expr {
-        super::Expression::Variable { ident, span: _ } => env.vars.lookup_var(ident),
+        super::Expression::Variable { ident } => env.vars.lookup_var(ident),
         super::Expression::Integer(x, _) => EvalVal::Int(x.clone()),
         super::Expression::HardInt(x) => EvalVal::Hard(x.clone()),
         super::Expression::Str(_, _) => todo!(),
@@ -144,7 +144,6 @@ where
         super::Expression::FuncApplication {
             func_name,
             args,
-            span: _, // eval_subtraction(env, &args[0], &args[1]),
         } => match func_name.0.as_str() {
             "__add" | "__sub" | "__mul" | "__div" | "__eq" | "__lt" | "__gt" | "__and" | "__or" => {
                 match (

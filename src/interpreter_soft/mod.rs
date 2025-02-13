@@ -142,7 +142,6 @@ fn apply_gradient_expr(
         ast::Expression::FuncApplication {
             func_name: _,
             args,
-            span: _,
         } => {
             for arg in args {
                 apply_gradient_expr(arg, grad);
@@ -208,7 +207,7 @@ fn apply_gradient_expr(
             apply_gradient_expr(body.as_mut(), grad);
             apply_gradient_expr(exit_body.as_mut(), grad);
         }
-        ast::Expression::Variable { ident: _, span: _ } => {}
+        ast::Expression::Variable { ident: _} => {}
         ast::Expression::HardInt(_) => {}
     }
 }

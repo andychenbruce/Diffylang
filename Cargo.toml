@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-parsel = "0.16.0"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 statrs = "0.18.0"
