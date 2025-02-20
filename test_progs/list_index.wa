@@ -1,6 +1,0 @@
-[index_list_wrong_1
-  ((l : list), (x : int)) -> int
-  (__index(l, (x + 1)))];
-
-
-{(index_list_wrong_1({int ; 0, 100, 20, 0, 0, 30, 0}, 1) == 100)};

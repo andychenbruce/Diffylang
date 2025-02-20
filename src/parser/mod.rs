@@ -1,29 +1,146 @@
 //TODO: make an actual LL or LR parser generator instead whatever this is
 
+#[derive(Debug)]
+pub struct ParseError {
+    pos_start: ParsePos,
+    pos_end: ParsePos,
+    reason: ParseErrorReason,
+}
+
+#[derive(Debug)]
+pub enum ParseErrorReason {
+    MissingClosingParenthesis,
+    UnexpectedEOF,
+    UnexpectedRightParenthesis,
+    StrayAtom,
+    EmptyDeclaration,
+    ExpectedName,
+    ExpectedUniverse,
+    ExpectedArgs,
+    ExpectedConstructors,
+    ExpectedType,
+    ExpectedExpression,
+    VariableNameIsKeyword,
+    EmptyExpression,
+    ExpectedBindings,
+    ArgDoesntStartWithColon,
+    EmptyArg,
+}
+
 #[derive(Debug, Clone)]
 pub enum TokenNonParen {
-    Name(String),
+    NonKeyword(String),
     Defun,
+    Defgadt,
+    Deftest,
     Colon,
-    Fold,
     If,
     Let,
 }
 
-pub enum Token {
+pub enum TokenVal {
     ParenLeft,
     ParenRight,
     Other(TokenNonParen),
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ParsePos {
+    col: usize,
+    line: usize,
+}
+
+pub struct Token {
+    val: TokenVal,
+    pos_start: ParsePos,
+    pos_end: ParsePos,
+}
+
+struct CharIter<'a> {
+    chars: std::str::Chars<'a>,
+    pub curr_pos: ParsePos,
+    peek_cache: Option<Option<char>>,
+}
+
 pub struct Tokens<'a> {
-    chars: std::iter::Peekable<std::str::Chars<'a>>,
+    char_iter: CharIter<'a>,
 }
 
 impl<'a> Tokens<'a> {
     pub fn new(code: &'a str) -> Self {
         Self {
-            chars: code.chars().peekable(),
+            char_iter: CharIter {
+                chars: code.chars(),
+                curr_pos: ParsePos { col: 0, line: 0 },
+                peek_cache: None,
+            },
+        }
+    }
+    fn take_whitespace(&mut self) {
+        while self.char_iter.next_if(|x| x.is_whitespace()).is_some() {}
+    }
+
+    fn token_parse_string(&mut self) -> TokenVal {
+        let mut name: String = "".to_owned();
+
+        while let Some(c) = self
+            .char_iter
+            .next_if(|x| !(x.is_whitespace() || *x == '(' || *x == ')'))
+        {
+            name.push(c);
+        }
+
+        TokenVal::Other(match name.as_str() {
+            ":" => TokenNonParen::Colon,
+            "if" => TokenNonParen::If,
+            "let" => TokenNonParen::Let,
+            "defun" => TokenNonParen::Defun,
+            "deftest" => TokenNonParen::Deftest,
+            "defgadt" => TokenNonParen::Defgadt,
+            _ => TokenNonParen::NonKeyword(name),
+        })
+    }
+}
+
+impl<'a> Iterator for CharIter<'a> {
+    type Item = char;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(x) = self.peek_cache {
+            self.peek_cache = None;
+            return x;
+        }
+
+        let next = self.chars.next();
+        if let Some(next) = next {
+            self.curr_pos.col += 1;
+            if next == '\n' {
+                self.curr_pos.col = 0;
+                self.curr_pos.line += 1;
+            }
+        }
+        next
+    }
+}
+
+impl<'a> CharIter<'a> {
+    fn peek(&mut self) -> Option<char> {
+        if let Some(x) = self.peek_cache {
+            return x;
+        }
+
+        let next = self.next();
+        self.peek_cache = Some(next);
+
+        return next;
+    }
+    pub fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> Option<char> {
+        match self.next() {
+            Some(matched) if func(&matched) => Some(matched),
+            other => {
+                assert!(self.peek_cache.is_none());
+                self.peek_cache = Some(other);
+                None
+            }
         }
     }
 }
@@ -32,55 +149,49 @@ impl<'a> Iterator for Tokens<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        take_whitespace(&mut self.chars);
-        if let Some(c) = self.chars.peek() {
-            if *c == '(' {
-                self.chars.next();
-                Some(Token::ParenLeft)
-            } else if *c == ')' {
-                self.chars.next();
-                Some(Token::ParenRight)
-            } else if *c == ':' {
-                self.chars.next();
-                Some(Token::Other(TokenNonParen::Colon))
+        self.take_whitespace();
+        if let Some(c) = self.char_iter.peek() {
+            let start_pos = self.char_iter.curr_pos;
+            let token_val = if c == '(' {
+                self.char_iter.next();
+                TokenVal::ParenLeft
+            } else if c == ')' {
+                self.char_iter.next();
+                TokenVal::ParenRight
+            } else if c == ':' {
+                self.char_iter.next();
+                TokenVal::Other(TokenNonParen::Colon)
             } else {
-                Some(token_parse_string(&mut self.chars))
-            }
+                self.token_parse_string()
+            };
+
+            return Some(Token {
+                val: token_val,
+                pos_start: start_pos,
+                pos_end: self.char_iter.curr_pos,
+            });
         } else {
             None
         }
     }
 }
 
-fn take_whitespace<I: Iterator<Item = char>>(code: &mut std::iter::Peekable<I>) {
-    while code.next_if(|x| x.is_whitespace()).is_some() {}
-}
-fn token_parse_string<I: Iterator<Item = char>>(code: &mut std::iter::Peekable<I>) -> Token {
-    let mut name: String = "".to_owned();
-
-    while let Some(c) = code.next_if(|x| !(x.is_whitespace() || *x == '(' || *x == ')')) {
-        name.push(c);
-    }
-
-    Token::Other(match name.as_str() {
-        ":" => TokenNonParen::Colon,
-        "fold" => TokenNonParen::Fold,
-        "if" => TokenNonParen::If,
-        "let" => TokenNonParen::Let,
-        "defun" => TokenNonParen::Defun,
-        _ => TokenNonParen::Name(name),
-    })
+#[derive(Debug)]
+pub struct TokenTree {
+    val: TokenTreeVal,
+    start_pos: ParsePos,
+    end_pos: ParsePos,
 }
 
 #[derive(Debug)]
-pub enum TokenTree {
+pub enum TokenTreeVal {
     Leaf(TokenNonParen),
     Branch(Vec<TokenTree>),
 }
 
 pub fn make_token_trees(
     tokens: &mut std::iter::Peekable<Tokens>,
-) -> Result<Vec<TokenTree>, &'static str> {
+) -> Result<Vec<TokenTree>, ParseError> {
     let mut trees = vec![];
 
     while let Some(tree) = make_token_tree(tokens)? {
@@ -92,166 +203,336 @@ pub fn make_token_trees(
 
 pub fn make_token_tree(
     tokens: &mut std::iter::Peekable<Tokens>,
-) -> Result<Option<TokenTree>, &'static str> {
+) -> Result<Option<TokenTree>, ParseError> {
     if let Some(next_token) = tokens.next() {
-        if let Token::Other(tok) = next_token {
-            return Ok(Some(TokenTree::Leaf(tok)));
-        }
-        if !matches!(next_token, Token::ParenLeft) {
-            //println!("bruh = {:?}", next_token);
-            return Err("expected left parenthesis");
+        match next_token.val {
+            TokenVal::Other(tok) => {
+                return Ok(Some(TokenTree {
+                    val: TokenTreeVal::Leaf(tok),
+                    start_pos: next_token.pos_start,
+                    end_pos: next_token.pos_end,
+                }));
+            }
+            TokenVal::ParenLeft => {
+                let mut children: Vec<TokenTree> = vec![];
+
+                loop {
+                    if let Some(t) = tokens.peek() {
+                        let t_start = t.pos_start;
+                        let t_end = t.pos_end;
+                        match &t.val {
+                            TokenVal::ParenLeft => {
+                                children.push(make_token_tree(tokens)?.ok_or(ParseError {
+                                    pos_start: t_start,
+                                    pos_end: t_end,
+                                    reason: ParseErrorReason::UnexpectedEOF,
+                                })?)
+                            }
+                            TokenVal::ParenRight => {
+                                let out = TokenTree {
+                                    val: TokenTreeVal::Branch(children),
+                                    start_pos: t.pos_start,
+                                    end_pos: t.pos_end,
+                                };
+                                tokens.next();
+                                return Ok(Some(out));
+                            }
+                            TokenVal::Other(n) => {
+                                children.push(TokenTree {
+                                    val: TokenTreeVal::Leaf(n.clone()),
+                                    start_pos: t.pos_start,
+                                    end_pos: t.pos_end,
+                                });
+                                tokens.next();
+                            }
+                        }
+                    } else {
+                        return Err(ParseError {
+                            pos_start: next_token.pos_start,
+                            pos_end: next_token.pos_end,
+                            reason: ParseErrorReason::MissingClosingParenthesis,
+                        });
+                    }
+                }
+            }
+
+            _ => {
+                return Err(ParseError {
+                    pos_start: next_token.pos_start,
+                    pos_end: next_token.pos_end,
+                    reason: ParseErrorReason::UnexpectedRightParenthesis,
+                })
+            }
         }
     } else {
         return Ok(None);
     }
-
-    let mut children: Vec<TokenTree> = vec![];
-
-    loop {
-        if let Some(t) = tokens.peek() {
-            match t {
-                Token::ParenLeft => {
-                    children.push(make_token_tree(tokens)?.ok_or("unexpected EOF")?)
-                }
-                Token::ParenRight => {
-                    tokens.next();
-                    break;
-                }
-                Token::Other(n) => {
-                    children.push(TokenTree::Leaf(n.clone()));
-                    tokens.next();
-                }
-            }
-        } else {
-            return Err("mismatched parenthesis");
-        }
-    }
-
-    Ok(Some(TokenTree::Branch(children)))
 }
 
-pub fn parse_program(token_trees: Vec<TokenTree>) -> Result<ProgramParseTree, &'static str> {
+pub fn parse_program(token_trees: Vec<TokenTree>) -> Result<ProgramParseTree, ParseError> {
     let declarations = token_trees
         .into_iter()
-        .map(|x| parse_declaration(&x))
-        .collect::<Result<Vec<_>, &'static str>>()?;
+        .map(|x| parse_top(&x))
+        .collect::<Result<Vec<_>, ParseError>>()?;
 
     Ok(ProgramParseTree { declarations })
 }
 
-pub fn parse_declaration(token_tree: &TokenTree) -> Result<Declaration, &'static str> {
-    match token_tree {
-        TokenTree::Leaf(_) => Err("expected declaration"),
-        TokenTree::Branch(vec) => {
-            if !matches!(
-                vec.get(0).ok_or("declaration empty")?,
-                TokenTree::Leaf(TokenNonParen::Defun)
-            ) {
-                return Err("declarations must start with \"defun\"");
-            }
-            let name = parse_name(vec.get(1).ok_or("declaration missing name")?)?;
-            let args = parse_args(vec.get(2).ok_or("declaration missing args")?)?;
-            let to_type = parse_name(vec.get(3).ok_or("declaration missing return type")?)?;
-            let body = parse_expr(vec.get(4).ok_or("declaration missing body")?)?;
-
-            return Ok(Declaration::FunctionDef(FunctionDefinition {
-                name,
-                arguments: args,
-                to_type: VarType(to_type),
-                func_body: body,
-            }));
-        }
-    }
-}
-
-pub fn parse_expr(token_tree: &TokenTree) -> Result<Expression, &'static str> {
-    match token_tree {
-        TokenTree::Leaf(token_non_paren) => match token_non_paren {
-            TokenNonParen::Name(var_name) => Ok(Expression::Variable(var_name.clone())),
-            TokenNonParen::Defun => Err("uhh"),
-            TokenNonParen::Colon => Err("bruh"),
-            TokenNonParen::Fold => Err("mmm"),
-            TokenNonParen::If => Err("idk"),
-            TokenNonParen::Let => Err("bruh"),
-        },
-        TokenTree::Branch(sub_trees) => {
-            let first = sub_trees.get(0).ok_or("expr missing first")?;
-            match first {
-                TokenTree::Leaf(token_non_paren) => {
-                    match token_non_paren {
-                        TokenNonParen::Name(func_name) => {
-
-                            let args = sub_trees[1..].iter().map(parse_expr).collect::<Result<Vec<_>, _>>()?;
-                            Ok(Expression::FunctionApplication{
-                                func_name: func_name.clone(),
-                                args
-                            })
-                        }
-                        TokenNonParen::Defun => todo!(),
-                        TokenNonParen::Colon => todo!(),
-                        TokenNonParen::Fold => {
-                            let iter_val =
-                                parse_expr(sub_trees.get(1).ok_or("fold loop missing iterator")?)?;
-                            let accumulator = parse_accumulator(
-                                sub_trees.get(2).ok_or("fold loop missing accumulator")?,
-                            )?;
-                            let body = parse_expr(
-                                sub_trees.get(2).ok_or("fold loop missing accumulator")?,
-                            )?;
-                            Ok(Expression::FoldLoop {
-                                iter_val: Box::new(iter_val),
-                                accumulator,
-                                body: Box::new(body),
-                            })
-                        }
-                        TokenNonParen::If => {
-                            let boolean_expr =
-                                parse_expr(sub_trees.get(1).ok_or("if expr missing conditional")?)?;
-                            let true_branch =
-                                parse_expr(sub_trees.get(2).ok_or("if expr missing true branch")?)?;
-                            let false_branch = parse_expr(
-                                sub_trees.get(3).ok_or("if expr missing false branch")?,
-                            )?;
-
-                            Ok(Expression::IfThenElse {
-                                boolean: Box::new(boolean_expr),
-                                true_expr: Box::new(true_branch),
-                                false_expr: Box::new(false_branch),
-                            })
-                        }
-                        TokenNonParen::Let => {
-                            let let_bindings: Vec<LetBind> = parse_let_bindings(
-                                sub_trees.get(1).ok_or("let bindings missing bindings")?,
-                            )?;
-                            let inner: Expression =
-                                parse_expr(sub_trees.get(2).ok_or("let bindings missing body")?)?;
-
-                            Ok(Expression::LetBinds {
-                                bindings: let_bindings,
-                                inner: Box::new(inner),
-                            })
-                        }
-                    }
+pub fn parse_top(token_tree: &TokenTree) -> Result<Declaration, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Leaf(_) => Err(ParseError {
+            pos_start: token_tree.start_pos,
+            pos_end: token_tree.end_pos,
+            reason: ParseErrorReason::StrayAtom,
+        }),
+        TokenTreeVal::Branch(vec) => match &vec
+            .get(0)
+            .ok_or(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::EmptyDeclaration,
+            })?
+            .val
+        {
+            TokenTreeVal::Leaf(token_non_paren) => match token_non_paren {
+                TokenNonParen::Defun => {
+                    parse_defun(token_tree.start_pos, token_tree.end_pos, &vec[1..])
                 }
-                TokenTree::Branch(_) => todo!(),
+                TokenNonParen::Defgadt => {
+                    parse_defgadt(token_tree.start_pos, token_tree.end_pos, &vec[1..])
+                }
+                TokenNonParen::Deftest => {
+                    parse_deftest(token_tree.start_pos, token_tree.end_pos, &vec[1..])
+                }
+                _ => todo!(),
+            },
+            TokenTreeVal::Branch(_) => todo!(),
+        },
+    }
+}
+
+pub fn parse_defgadt(
+    start_pos: ParsePos,
+    end_pos: ParsePos,
+    vec: &[TokenTree],
+) -> Result<Declaration, ParseError> {
+    let name = parse_name(vec.get(0).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedName,
+    })?)?;
+    let universe: u64 = parse_universe(vec.get(1).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedUniverse,
+    })?)?;
+    let args = parse_args(vec.get(2).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedArgs,
+    })?)?;
+    let constructors = parse_args(vec.get(3).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedConstructors,
+    })?)?;
+
+    return Ok(Declaration::GadtDef(GadtDefinition {
+        name,
+        universe,
+        arguments: args,
+        constructors,
+    }));
+}
+
+pub fn parse_defun(
+    start_pos: ParsePos,
+    end_pos: ParsePos,
+    vec: &[TokenTree],
+) -> Result<Declaration, ParseError> {
+    let name = parse_name(vec.get(0).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedName,
+    })?)?;
+    let universe: u64 = parse_universe(vec.get(1).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedUniverse,
+    })?)?;
+    let args = parse_args(vec.get(2).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedConstructors,
+    })?)?;
+    let to_type = parse_expr(vec.get(3).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedType,
+    })?)?;
+    let body = parse_expr(vec.get(4).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedExpression,
+    })?)?;
+
+    return Ok(Declaration::FunctionDef(FunctionDefinition {
+        name,
+        universe,
+        arguments: args,
+        to_type,
+        func_body: body,
+    }));
+}
+
+pub fn parse_deftest(
+    start_pos: ParsePos,
+    end_pos: ParsePos,
+    vec: &[TokenTree],
+) -> Result<Declaration, ParseError> {
+    let body = parse_expr(vec.get(4).ok_or(ParseError {
+        pos_start: start_pos,
+        pos_end: end_pos,
+        reason: ParseErrorReason::ExpectedExpression,
+    })?)?;
+
+    Ok(Declaration::TestCaseDef(body))
+}
+
+pub fn parse_universe(token_tree: &TokenTree) -> Result<u64, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Leaf(x) => match x {
+            TokenNonParen::NonKeyword(universe_number) => match parse_leaf_name(universe_number) {
+                Expression::UniverseLit(x) => Ok(x),
+                _ => todo!(),
+            },
+            TokenNonParen::Defun => todo!(),
+            TokenNonParen::Defgadt => todo!(),
+            TokenNonParen::Deftest => todo!(),
+            TokenNonParen::Colon => todo!(),
+            TokenNonParen::If => todo!(),
+            TokenNonParen::Let => todo!(),
+        },
+        TokenTreeVal::Branch(_) => todo!(),
+    }
+}
+
+pub fn parse_leaf_name(s: &str) -> Expression {
+    if s.chars().next().unwrap().is_ascii_digit() {
+        let (indicie, _) = s.char_indices().last().unwrap();
+        match s.split_at(indicie) {
+            (num, "i") => Expression::IntegerLit(num.parse().unwrap()),
+            (num, "f") => Expression::FloatLit(num.parse().unwrap()),
+            (num, "u") => Expression::UniverseLit(num.parse().unwrap()),
+            _ => panic!("bad integer"),
+        }
+    } else {
+        return Expression::Variable(s.to_owned());
+    }
+}
+
+pub fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Leaf(token_non_paren) => match token_non_paren {
+            TokenNonParen::NonKeyword(var_name) => Ok(parse_leaf_name(var_name)),
+            _ => Err(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::VariableNameIsKeyword,
+            }),
+        },
+        TokenTreeVal::Branch(sub_trees) => {
+            let first = sub_trees.get(0).ok_or(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::EmptyExpression,
+            })?;
+            match &first.val {
+                TokenTreeVal::Leaf(token_non_paren) => match token_non_paren {
+                    TokenNonParen::NonKeyword(func_name) => {
+                        let args = sub_trees[1..]
+                            .iter()
+                            .map(parse_expr)
+                            .collect::<Result<Vec<_>, _>>()?;
+                        Ok(Expression::FunctionApplication {
+                            func_name: func_name.clone(),
+                            args,
+                        })
+                    }
+                    TokenNonParen::Defun => todo!(),
+                    TokenNonParen::Deftest => todo!(),
+                    TokenNonParen::Defgadt => todo!(),
+                    TokenNonParen::Colon => todo!(),
+                    TokenNonParen::If => {
+                        let boolean_expr = parse_expr(sub_trees.get(1).ok_or(ParseError {
+                            pos_start: token_tree.start_pos,
+                            pos_end: token_tree.end_pos,
+                            reason: ParseErrorReason::ExpectedExpression,
+                        })?)?;
+                        let true_branch = parse_expr(sub_trees.get(2).ok_or(ParseError {
+                            pos_start: token_tree.start_pos,
+                            pos_end: token_tree.end_pos,
+                            reason: ParseErrorReason::ExpectedExpression,
+                        })?)?;
+                        let false_branch = parse_expr(sub_trees.get(3).ok_or(ParseError {
+                            pos_start: token_tree.start_pos,
+                            pos_end: token_tree.end_pos,
+                            reason: ParseErrorReason::ExpectedExpression,
+                        })?)?;
+
+                        Ok(Expression::IfThenElse {
+                            boolean: Box::new(boolean_expr),
+                            true_expr: Box::new(true_branch),
+                            false_expr: Box::new(false_branch),
+                        })
+                    }
+                    TokenNonParen::Let => {
+                        let let_bindings: Vec<LetBind> =
+                            parse_let_bindings(sub_trees.get(1).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedBindings,
+                            })?)?;
+                        let inner: Expression =
+                            parse_expr(sub_trees.get(2).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedExpression,
+                            })?)?;
+
+                        Ok(Expression::LetBinds {
+                            bindings: let_bindings,
+                            inner: Box::new(inner),
+                        })
+                    }
+                },
+                TokenTreeVal::Branch(_) => todo!(),
             }
         }
     }
 }
 
-pub fn parse_let_bindings(token_tree: &TokenTree) -> Result<Vec<LetBind>, &'static str> {
-    match token_tree {
-        TokenTree::Leaf(_) => todo!(),
-        TokenTree::Branch(vec) => vec.into_iter().map(parse_let_binding).collect(),
+pub fn parse_let_bindings(token_tree: &TokenTree) -> Result<Vec<LetBind>, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Leaf(_) => todo!(),
+        TokenTreeVal::Branch(vec) => vec.into_iter().map(parse_let_binding).collect(),
     }
 }
 
-pub fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, &'static str> {
-    match token_tree {
-        TokenTree::Leaf(_) => todo!(),
-        TokenTree::Branch(vec) => {
-            let name = parse_name(vec.get(0).ok_or("let binding missing name")?)?;
-            let body = parse_expr(vec.get(1).ok_or("let binding missing body")?)?;
+pub fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Leaf(_) => todo!(),
+        TokenTreeVal::Branch(vec) => {
+            let name = parse_name(vec.get(0).ok_or(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::ExpectedName,
+            })?)?;
+            let body = parse_expr(vec.get(1).ok_or(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::ExpectedExpression,
+            })?)?;
 
             return Ok(LetBind {
                 name,
@@ -261,55 +542,56 @@ pub fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, &'static str
     }
 }
 
-pub fn parse_accumulator(token_tree: &TokenTree) -> Result<FoldAccumulator, &'static str> {
-    match token_tree {
-        TokenTree::Leaf(_) => todo!(),
-        TokenTree::Branch(vec) => {
-            let name = parse_name(vec.get(0).ok_or("acc binding missing name")?)?;
-            let body = parse_expr(vec.get(1).ok_or("acc binding missing body")?)?;
-
-            return Ok(FoldAccumulator {
-                name,
-                initial_expression: Box::new(body),
-            });
-        }
-    }
-}
-
-pub fn parse_arg(token_tree: &TokenTree) -> Result<Argument, &'static str> {
-    match token_tree {
-        TokenTree::Branch(vec) => {
-            let colon = vec.get(0).ok_or("arg empty")?;
-            if !matches!(colon, TokenTree::Leaf(TokenNonParen::Colon)) {
-                return Err("args must start with \":\"");
+pub fn parse_arg(token_tree: &TokenTree) -> Result<Argument, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Branch(vec) => {
+            let colon = vec.get(0).ok_or(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::EmptyArg,
+            })?;
+            if !matches!(colon.val, TokenTreeVal::Leaf(TokenNonParen::Colon)) {
+                return Err(ParseError {
+                    pos_start: token_tree.start_pos,
+                    pos_end: token_tree.end_pos,
+                    reason: ParseErrorReason::ArgDoesntStartWithColon,
+                });
             }
 
-            let varname = parse_name(vec.get(1).ok_or("arg missing name")?)?;
-            let typename = parse_name(vec.get(2).ok_or("arg missing type")?)?;
+            let varname = parse_name(vec.get(1).ok_or(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::ExpectedName,
+            })?)?;
+            let typename = parse_expr(vec.get(2).ok_or(ParseError {
+                pos_start: token_tree.start_pos,
+                pos_end: token_tree.end_pos,
+                reason: ParseErrorReason::ExpectedExpression,
+            })?)?;
 
             Ok(Argument {
                 varname,
-                vartype: VarType(typename),
+                vartype: typename,
             })
         }
-        TokenTree::Leaf(_) => Err("bruh asdf"),
+        TokenTreeVal::Leaf(_) => todo!(),
     }
 }
 
-pub fn parse_args(token_tree: &TokenTree) -> Result<Vec<Argument>, &'static str> {
-    match token_tree {
-        TokenTree::Branch(vec) => Ok(vec
+pub fn parse_args(token_tree: &TokenTree) -> Result<Vec<Argument>, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Branch(vec) => Ok(vec
             .into_iter()
             .map(parse_arg)
             .collect::<Result<Vec<_>, _>>()?),
-        TokenTree::Leaf(_) => Err("bruh idk"),
+        TokenTreeVal::Leaf(_) => todo!(),
     }
 }
 
-pub fn parse_name(token_tree: &TokenTree) -> Result<String, &'static str> {
-    match token_tree {
-        TokenTree::Leaf(TokenNonParen::Name(n)) => Ok(n.clone()),
-        _ => Err("bruh"),
+pub fn parse_name(token_tree: &TokenTree) -> Result<String, ParseError> {
+    match &token_tree.val {
+        TokenTreeVal::Leaf(TokenNonParen::NonKeyword(n)) => Ok(n.clone()),
+        _ => todo!(),
     }
 }
 
@@ -321,48 +603,36 @@ pub struct ProgramParseTree {
 #[derive(Clone, Debug)]
 pub enum Declaration {
     FunctionDef(FunctionDefinition),
+    GadtDef(GadtDefinition),
     TestCaseDef(Expression),
+}
+
+#[derive(Clone, Debug)]
+pub struct GadtDefinition {
+    pub name: String,
+    pub universe: u64,
+    pub arguments: Vec<Argument>,
+    pub constructors: Vec<Argument>,
 }
 
 #[derive(Clone, Debug)]
 pub struct FunctionDefinition {
     pub name: String,
+    pub universe: u64,
     pub arguments: Vec<Argument>,
-    pub to_type: VarType,
+    pub to_type: Expression,
     pub func_body: Expression,
 }
 
 #[derive(Clone, Debug)]
 pub struct Argument {
     pub varname: String,
-    pub vartype: VarType,
+    pub vartype: Expression,
 }
-
-#[derive(Clone, Debug)]
-pub struct VarType(pub String);
 
 #[derive(Clone, Debug)]
 pub enum Expression {
     Product(ProductType),
-    ProductProject {
-        index: i64,
-        value: Box<Expression>,
-    },
-
-    ListLit(ListInner),
-    FoldLoop {
-        iter_val: Box<Expression>,
-        accumulator: FoldAccumulator,
-        body: Box<Expression>,
-    },
-    WhileFoldLoop {
-        //while_token: Token![while],
-        accumulator: FoldAccumulator,
-        cond: Box<Expression>,
-        body: Box<Expression>,
-        exit_body: Box<Expression>,
-    },
-
     FunctionApplication {
         func_name: String,
         args: Vec<Expression>,
@@ -370,21 +640,9 @@ pub enum Expression {
 
     Variable(String),
     IntegerLit(i64),
-    StringLit(String),
     FloatLit(f64),
     BoolLit(bool),
-
-    Addition(BinaryOp),
-    Subtraction(BinaryOp),
-    Multiplication(BinaryOp),
-    Division(BinaryOp),
-    Equality(BinaryOp),
-    GreaterThan(BinaryOp),
-    LessThan(BinaryOp),
-    And(BinaryOp),
-    Or(BinaryOp),
-
-    Not(Box<Expression>),
+    UniverseLit(u64),
 
     LetBinds {
         bindings: Vec<LetBind>,
@@ -395,37 +653,12 @@ pub enum Expression {
         true_expr: Box<Expression>,
         false_expr: Box<Expression>,
     },
-    // },
-    //     ListIndex{
-    //     #[parsel(recursive)]
-    //     list: Box<Expression>,
-    //     #[parsel(recursive)]
-    //     index: parsel::ast::Brace<Box<Expression>>
-    // },
-}
-
-#[derive(Clone, Debug)]
-pub struct FoldAccumulator {
-    pub name: String,
-    pub initial_expression: Box<Expression>,
-}
-
-#[derive(Clone, Debug)]
-pub struct BinaryOp {
-    pub left_side: Box<Expression>,
-    pub right_side: Box<Expression>,
 }
 
 #[derive(Clone, Debug)]
 pub struct LetBind {
     pub name: String,
     pub value: Box<Expression>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ListInner {
-    pub type_name: String,
-    pub values: Vec<Expression>,
 }
 
 #[derive(Clone, Debug)]

@@ -1,0 +1,9 @@
+(defgadt Vec 2u ((: a 1u) (: n Nat))
+  ((: leaf (Vec a zero))
+   (: cons (-> a (Vec a n) (Vec a (succ n))))))
+
+(defgadt Nat 1u ()
+  ((: zero Nat)
+   (: succ (-> Nat Nat))))
+
+(defun asdf 1u ((: a __int)) int (__add_int a 1i))

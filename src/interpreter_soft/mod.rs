@@ -1,15 +1,14 @@
 use crate::ast;
-use statrs::distribution::Continuous;
-use statrs::distribution::ContinuousCDF;
+// use statrs::distribution::Continuous;
+// use statrs::distribution::ContinuousCDF;
 
-pub type SoftValue = ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>;
+pub type SoftValue = ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool>;
 
-pub const SOFT_AST_INIT: ast::ProgramInitFunctions<SoftInt, SoftFloat, SoftBool, i64> =
+pub const SOFT_AST_INIT: ast::ProgramInitFunctions<SoftInt, SoftFloat, SoftBool> =
     ast::ProgramInitFunctions {
         make_int,
         make_float,
         make_bool,
-        make_hard,
     };
 
 pub fn make_int(x: i64, lit: ast::LitId, num_ids: usize) -> SoftInt {
@@ -122,7 +121,7 @@ pub fn make_oneshot(size: usize, pos: crate::ast::LitId) -> Gradient {
 }
 
 pub fn apply_gradient_program(
-    program: &mut ast::Program<SoftInt, SoftFloat, SoftBool, i64>,
+    program: &mut ast::Program<SoftInt, SoftFloat, SoftBool>,
     grad: &Gradient,
 ) {
     for function in program.functions.iter_mut() {
@@ -130,19 +129,12 @@ pub fn apply_gradient_program(
     }
 }
 
-fn apply_gradient_expr(
-    expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool, i64>,
-    grad: &Gradient,
-) {
+fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>, grad: &Gradient) {
     match expr {
         ast::Expression::Integer(val, id) => val.val += grad.values[id.0.unwrap()],
         ast::Expression::Float(val, id) => val.val += grad.values[id.0.unwrap()],
-        ast::Expression::Str(_, _) => todo!(),
         ast::Expression::Bool(val, id) => val.val += grad.values[id.0.unwrap()],
-        ast::Expression::FuncApplication {
-            func_name: _,
-            args,
-        } => {
+        ast::Expression::FuncApplication { func_name: _, args } => {
             for arg in args {
                 apply_gradient_expr(arg, grad);
             }
@@ -159,17 +151,6 @@ fn apply_gradient_expr(
                 apply_gradient_expr(val, grad);
             }
         }
-        ast::Expression::ProductProject { value, index: _ } => {
-            apply_gradient_expr(value, grad);
-        }
-        ast::Expression::List {
-            type_name: _,
-            values,
-        } => {
-            for val in values {
-                apply_gradient_expr(val, grad);
-            }
-        }
         ast::Expression::IfThenElse {
             boolean,
             true_expr,
@@ -179,28 +160,8 @@ fn apply_gradient_expr(
             apply_gradient_expr(true_expr, grad);
             apply_gradient_expr(false_expr, grad);
         }
-        ast::Expression::FoldLoop {
-            fold_iter,
-            accumulator,
-            body,
-        } => {
-            apply_gradient_expr(fold_iter, grad);
-            apply_gradient_expr(accumulator.1.as_mut(), grad);
-            apply_gradient_expr(body, grad);
-        }
-        ast::Expression::WhileLoop {
-            accumulator,
-            cond,
-            body,
-            exit_body,
-        } => {
-            apply_gradient_expr(accumulator.1.as_mut(), grad);
-            apply_gradient_expr(cond.as_mut(), grad);
-            apply_gradient_expr(body.as_mut(), grad);
-            apply_gradient_expr(exit_body.as_mut(), grad);
-        }
-        ast::Expression::Variable { ident: _} => {}
-        ast::Expression::HardInt(_) => {}
+        ast::Expression::Variable { ident: _ } => {}
+        ast::Expression::Universe(_) => {}
     }
 }
 
@@ -210,7 +171,7 @@ pub struct SoftEvaluator {
     pub sigma_list: f64,
 }
 
-impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEvaluator {
+impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool> for SoftEvaluator {
     fn eval_addition_ints(&self, a: SoftInt, b: SoftInt) -> SoftInt {
         let new_val = a.val + b.val;
         let new_gradient = a.gradient + b.gradient;
@@ -219,10 +180,6 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
             val: new_val,
             gradient: new_gradient,
         }
-    }
-
-    fn eval_addition_hards(&self, a: i64, b: i64) -> i64 {
-        a + b
     }
 
     fn eval_addition_floats(&self, a: SoftFloat, b: SoftFloat) -> SoftFloat {
@@ -260,10 +217,6 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
             val: -1.0 * a.val,
             gradient: a.gradient * -1.0,
         }
-    }
-
-    fn eval_negation_hard(&self, a: i64) -> i64 {
-        -a
     }
 
     fn eval_negation_float(&self, a: SoftFloat) -> SoftFloat {
@@ -365,9 +318,9 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
     fn eval_if(
         &self,
         cond: SoftBool,
-        true_branch: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
-        false_branch: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
-    ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
+        true_branch: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool>,
+        false_branch: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool>,
+    ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool> {
         match (true_branch, false_branch) {
             (ast::eval::EvalVal::Int(a), ast::eval::EvalVal::Int(b)) => {
                 ast::eval::EvalVal::Int(self.eval_addition_ints(
@@ -424,165 +377,7 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool, i64> for SoftEval
                         .collect(),
                 )
             }
-            (ast::eval::EvalVal::List(a), ast::eval::EvalVal::List(b)) => {
-                assert!(a.len() == b.len());
-
-                ast::eval::EvalVal::List(
-                    a.into_iter()
-                        .zip(b)
-                        .map(|(a_val, b_val)| self.eval_if(cond.clone(), a_val, b_val))
-                        .collect(),
-                )
-            }
             _ => todo!(),
         }
-    }
-
-    fn make_range(&self, start: i64, end: i64, num_ids: usize) -> Vec<SoftInt> {
-        (start..end)
-            .map(|x| make_int(x, ast::LitId(None), num_ids))
-            .collect()
-    }
-
-    fn eval_index(
-        &self,
-        l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
-        i: SoftInt,
-    ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
-        let dist = statrs::distribution::Normal::new(0.0, self.sigma_list).unwrap();
-        let stuff = l
-            .iter()
-            .enumerate()
-            .map(|(p, v)| {
-                let bott_val = (p as f64) - i.val - 0.5;
-                let top_val = (p as f64) - i.val + 0.5;
-                let bottom_cdf = if p == 0 { 0.0 } else { dist.cdf(bott_val) };
-                let top_cdf = if p == (l.len() - 1) {
-                    1.0
-                } else {
-                    dist.cdf(top_val)
-                };
-
-                let cdf = top_cdf - bottom_cdf;
-                let bottom_pdf = if p == 0 { 0.0 } else { dist.pdf(bott_val) };
-                let top_pdf = if p == (l.len() - 1) {
-                    0.0
-                } else {
-                    dist.pdf(top_val)
-                };
-
-                let index_grad = i.gradient.clone() * -1.0 * (top_pdf - bottom_pdf);
-                match v {
-                    ast::eval::EvalVal::Int(x) => {
-                        ast::eval::EvalVal::<SoftInt, SoftFloat, SoftBool, i64>::Int(
-                            self.eval_multiplication_int(
-                                x.clone(),
-                                SoftInt {
-                                    val: cdf,
-                                    gradient: index_grad,
-                                },
-                            ),
-                        )
-                    }
-                    ast::eval::EvalVal::Float(_) => todo!(),
-                    ast::eval::EvalVal::Bool(_) => todo!(),
-                    _ => todo!(),
-                }
-            })
-            .collect::<Vec<_>>();
-
-        match stuff[0].clone() {
-            ast::eval::EvalVal::Float(x) => ast::eval::EvalVal::Float(stuff.into_iter().fold(
-                SoftFloat {
-                    val: 0.0,
-                    gradient: make_oneshot(x.gradient.values.len(), crate::ast::LitId(None)),
-                },
-                |acc, val| {
-                    if let ast::eval::EvalVal::Float(other) = val {
-                        self.eval_addition_floats(acc, other)
-                    } else {
-                        panic!()
-                    }
-                },
-            )),
-            ast::eval::EvalVal::Int(x) => ast::eval::EvalVal::Int(stuff.into_iter().fold(
-                SoftInt {
-                    val: 0.0,
-                    gradient: make_oneshot(x.gradient.values.len(), crate::ast::LitId(None)),
-                },
-                |acc, val| {
-                    if let ast::eval::EvalVal::Int(other) = val {
-                        self.eval_addition_ints(acc, other)
-                    } else {
-                        panic!()
-                    }
-                },
-            )),
-            _ => todo!(),
-        }
-    }
-
-    fn eval_set_index(
-        &self,
-        l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
-        i: SoftInt,
-        v: ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>,
-    ) -> Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>> {
-        let dist = statrs::distribution::Normal::new(0.0, self.sigma_list).unwrap();
-        let stuff = (0..l.len())
-            .map(|p| {
-                let bott_val = (p as f64) - i.val - 0.5;
-                let top_val = (p as f64) - i.val + 0.5;
-                let bottom_cdf = if p == 0 { 0.0 } else { dist.cdf(bott_val) };
-                let top_cdf = if p == (l.len() - 1) {
-                    1.0
-                } else {
-                    dist.cdf(top_val)
-                };
-
-                let cdf = top_cdf - bottom_cdf;
-                let bottom_pdf = if p == 0 { 0.0 } else { dist.cdf(bott_val) };
-                let top_pdf = if p == (l.len() - 1) {
-                    0.0
-                } else {
-                    dist.cdf(top_val)
-                };
-
-                let index_grad = i.gradient.clone() * -1.0 * (top_pdf - bottom_pdf);
-
-                (cdf, index_grad)
-            })
-            .collect::<Vec<_>>();
-
-        stuff
-            .into_iter()
-            .zip(l)
-            .map(|((percent, grad), l_v)| {
-                self.eval_if(
-                    SoftBool {
-                        val: percent,
-                        gradient: grad,
-                    },
-                    v.clone(),
-                    l_v,
-                )
-            })
-            .collect()
-    }
-
-    fn eval_len(&self, l: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>) -> i64 {
-        l.len() as i64
-    }
-
-    fn stop_while_eval(&self, cond: SoftBool) -> bool {
-        cond.val < 0.5
-    }
-
-    fn eval_product_index(
-        &self,
-        p: Vec<ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64>>,
-        i: i64,
-    ) -> ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool, i64> {
-        p[i as usize].clone()
     }
 }

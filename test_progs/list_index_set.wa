@@ -1,9 +1,0 @@
-[index_list_set
-  ((l : int), (x : int), (v : int)) -> bool
-  (__set_index(l, (x+1), v))];
-
-[uhhh
-  () -> bool
-  (index_list_set({int ; 0, 0, 0, 0}, 1, 20))];
-
-{(__index(index_list_set({int ; 1, 2, 3, 4}, 1, 20), 1) == 20)};
