@@ -1,13 +1,21 @@
 pub mod eval;
-#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+pub mod type_check;
+
+#[derive(serde::Serialize, Clone, Debug)]
 pub struct Identifier(pub String);
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct TypeName(pub String);
 
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct Argument<IntType, FloatType, BoolType> {
+    pub name: Identifier,
+    pub value: Expression<IntType, FloatType, BoolType>,
+}
+
 #[derive(serde::Serialize, Clone)]
 pub struct Program<IntType, FloatType, BoolType> {
-    pub functions: Vec<FunctionDefinition<IntType, FloatType, BoolType>>,
+    pub global_bindings: Vec<Binding<IntType, FloatType, BoolType>>,
     pub test_cases: Vec<Expression<IntType, FloatType, BoolType>>,
     pub gadts: Vec<GadtDefinition<IntType, FloatType, BoolType>>,
     pub num_ids: usize,
@@ -18,18 +26,6 @@ pub struct ProgramInitFunctions<IntType, FloatType, BoolType> {
     pub make_int: fn(i64, LitId, usize) -> IntType,
     pub make_float: fn(f64, LitId, usize) -> FloatType,
     pub make_bool: fn(bool, LitId, usize) -> BoolType,
-}
-
-impl<IntType, FloatType, BoolType> Program<IntType, FloatType, BoolType> {
-    pub fn find_func(&self, name: &str) -> &FunctionDefinition<IntType, FloatType, BoolType> {
-        for func in self.functions.iter() {
-            if func.name.0 == name {
-                return func;
-            }
-        }
-        eprintln!("coulnd't find func {}", name);
-        unreachable!()
-    }
 }
 
 struct AstConversionState {
@@ -46,51 +42,68 @@ pub struct GadtDefinition<IntType, FloatType, BoolType> {
 }
 
 #[derive(serde::Serialize, Clone)]
-pub struct FunctionDefinition<IntType, FloatType, BoolType> {
+pub struct Binding<IntType, FloatType, BoolType> {
     pub name: Identifier,
-    pub universe: u64,
-    pub arguments: Vec<(Identifier, Expression<IntType, FloatType, BoolType>)>,
-    pub to_type: Expression<IntType, FloatType, BoolType>,
-    pub body: Expression<IntType, FloatType, BoolType>,
+    pub elem_type: Expression<IntType, FloatType, BoolType>,
+    pub value: Definition<IntType, FloatType, BoolType>,
 }
 
-#[derive(serde::Serialize, Copy, Clone)]
-pub struct LitId(pub Option<usize>);
+#[derive(serde::Serialize, Clone)]
+pub enum Definition<IntType, FloatType, BoolType> {
+    Instrinsic,
+    Evaluatable(Expression<IntType, FloatType, BoolType>),
+}
 
 #[derive(serde::Serialize, Clone)]
+pub struct DependentFunctionType<IntType, FloatType, BoolType> {
+    pub from_type: (Identifier, Expression<IntType, FloatType, BoolType>),
+    pub to_type: Expression<IntType, FloatType, BoolType>,
+}
+
+#[derive(serde::Serialize, Copy, Clone, Debug)]
+pub struct LitId(pub Option<usize>);
+
+#[derive(serde::Serialize, Clone, Debug)]
 pub enum Expression<IntType, FloatType, BoolType> {
     Variable {
         ident: Identifier,
     },
-    Product(Vec<Expression<IntType, FloatType, BoolType>>),
+    DependentProductType {
+        type_first: Box<Argument<IntType, FloatType, BoolType>>,
+        type_second: Box<Expression<IntType, FloatType, BoolType>>,
+    },
+    DependentFunctionType {
+        type_from: Box<Argument<IntType, FloatType, BoolType>>,
+        type_to: Box<Expression<IntType, FloatType, BoolType>>,
+    },
 
     Integer(IntType, LitId),
     Float(FloatType, LitId),
     Bool(BoolType, LitId),
     Universe(u64),
-    FuncApplication {
-        func_name: Identifier,
+    FuncApplicationMultipleArgs {
+        func: Box<Expression<IntType, FloatType, BoolType>>,
         args: Vec<Expression<IntType, FloatType, BoolType>>,
     },
     ExprWhere {
         bindings: Vec<LetBind<IntType, FloatType, BoolType>>,
         inner: Box<Expression<IntType, FloatType, BoolType>>,
     },
-    IfThenElse {
-        boolean: Box<Expression<IntType, FloatType, BoolType>>,
-        true_expr: Box<Expression<IntType, FloatType, BoolType>>,
-        false_expr: Box<Expression<IntType, FloatType, BoolType>>,
+
+    Lambda {
+        input: Identifier,
+        body: Box<Expression<IntType, FloatType, BoolType>>,
     },
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, Debug)]
 pub struct LetBind<IntType, FloatType, BoolType> {
     pub ident: Identifier,
     pub value: Expression<IntType, FloatType, BoolType>,
 }
 
 pub fn make_program<IntType, FloatType, BoolType>(
-    parse_tree: crate::parser::ProgramParseTree,
+    parse_tree: &crate::parser::ProgramParseTree,
     funcs: ProgramInitFunctions<IntType, FloatType, BoolType>,
 ) -> Program<IntType, FloatType, BoolType> {
     let state = AstConversionState {
@@ -98,7 +111,7 @@ pub fn make_program<IntType, FloatType, BoolType>(
         total: 0,
     };
 
-    let counter = make_program_inner(parse_tree.clone(), NULL_AST_INIT, state);
+    let counter = make_program_inner(parse_tree, NULL_AST_INIT, state);
 
     make_program_inner(
         parse_tree,
@@ -128,16 +141,16 @@ fn make_bool(x: bool, _: LitId, _: usize) -> bool {
 }
 
 fn make_program_inner<IntType, FloatType, BoolType>(
-    parse_tree: crate::parser::ProgramParseTree,
+    parse_tree: &crate::parser::ProgramParseTree,
     funcs: ProgramInitFunctions<IntType, FloatType, BoolType>,
     mut state: AstConversionState,
 ) -> Program<IntType, FloatType, BoolType> {
-    let functions = parse_tree
+    let bindings: Vec<Binding<IntType, FloatType, BoolType>> = parse_tree
         .declarations
         .iter()
         .filter_map(|x| match x {
-            crate::parser::Declaration::FunctionDef(f) => {
-                Some(make_function_definition(&mut state, &funcs, f))
+            crate::parser::Declaration::BindingDef(f) => {
+                Some(make_definition(&mut state, &funcs, f))
             }
             crate::parser::Declaration::TestCaseDef(_) => None,
             crate::parser::Declaration::GadtDef(_) => None,
@@ -154,68 +167,71 @@ fn make_program_inner<IntType, FloatType, BoolType>(
                     total: state.total,
                 },
                 &funcs,
-                t.clone(),
+                &t,
                 false,
             )),
-            crate::parser::Declaration::FunctionDef(_) => None,
+            crate::parser::Declaration::BindingDef(_) => None,
             crate::parser::Declaration::GadtDef(_) => None,
         })
         .collect();
 
-    let gadts = parse_tree
+    let gadts: Vec<GadtDefinition<IntType, FloatType, BoolType>> = parse_tree
         .declarations
         .iter()
         .filter_map(|x| match x {
             crate::parser::Declaration::TestCaseDef(_) => None,
-            crate::parser::Declaration::FunctionDef(_) => None,
+            crate::parser::Declaration::BindingDef(_) => None,
             crate::parser::Declaration::GadtDef(gadt_def) => Some(make_gadt(
                 &mut AstConversionState {
                     next_lit_id: LitId(None),
                     total: state.total,
                 },
                 &funcs,
-                gadt_def.clone(),
+                gadt_def,
                 true,
             )),
         })
         .collect();
 
+    // let constructors: Vec<FunctionDefinition<IntType, FloatType, BoolType>> = gadts
+    //     .iter()
+    //     .flat_map(|gadt| {
+    //         gadt.constructors.iter().map(|x| FunctionDefinition {
+    //             name: x.0.clone(),
+    //             func_type: DependentFunctionType {
+    //                 universe: gadt.universe + 1,
+    //                 from_type: todo!(),
+    //                 to_type: todo!(),
+    //             },
+    //             body: todo!(),
+    //         })
+    //     })
+    //     .collect();
+
     Program {
-        functions,
+        global_bindings: bindings,
         test_cases,
         gadts,
         num_ids: state.next_lit_id.0.unwrap(),
     }
 }
 
-fn make_function_definition<IntType, FloatType, BoolType>(
+fn make_definition<IntType, FloatType, BoolType>(
     state: &mut AstConversionState,
     funcs: &ProgramInitFunctions<IntType, FloatType, BoolType>,
-    value: &crate::parser::FunctionDefinition,
-) -> FunctionDefinition<IntType, FloatType, BoolType> {
-    FunctionDefinition {
+    value: &crate::parser::BindingDefinition,
+) -> Binding<IntType, FloatType, BoolType> {
+    Binding {
         name: Identifier(value.name.clone()),
-        universe: value.universe,
-        to_type: make_expression(state, funcs, value.to_type.clone(), true),
-        arguments: value
-            .clone()
-            .arguments
-            .into_iter()
-            .map(|x: crate::parser::Argument| {
-                (
-                    Identifier(x.varname.to_string()),
-                    make_expression(state, funcs, x.vartype, true),
-                )
-            })
-            .collect(),
-        body: make_expression(state, funcs, value.func_body.clone(), true),
+        elem_type: make_expression(state, funcs, &value.binding_type, true),
+        value: Definition::Evaluatable(make_expression(state, funcs, &value.func_body, true)),
     }
 }
 
 fn make_expression<IntType, FloatType, BoolType>(
     state: &mut AstConversionState,
     funcs: &ProgramInitFunctions<IntType, FloatType, BoolType>,
-    value: crate::parser::Expression,
+    value: &crate::parser::Expression,
     differentiable: bool,
 ) -> Expression<IntType, FloatType, BoolType> {
     match value {
@@ -229,7 +245,7 @@ fn make_expression<IntType, FloatType, BoolType>(
         }
         crate::parser::Expression::IntegerLit(x) => {
             let out = Expression::Integer(
-                (funcs.make_int)(x, state.next_lit_id, state.total),
+                (funcs.make_int)(*x, state.next_lit_id, state.total),
                 state.next_lit_id,
             );
             if let Some(x) = state.next_lit_id.0.as_mut() {
@@ -239,7 +255,7 @@ fn make_expression<IntType, FloatType, BoolType>(
         }
         crate::parser::Expression::FloatLit(x) => {
             let output = Expression::Float(
-                (funcs.make_float)(x, state.next_lit_id, state.total),
+                (funcs.make_float)(*x, state.next_lit_id, state.total),
                 state.next_lit_id,
             );
             if let Some(x) = state.next_lit_id.0.as_mut() {
@@ -249,7 +265,7 @@ fn make_expression<IntType, FloatType, BoolType>(
         }
         crate::parser::Expression::BoolLit(x) => {
             let output = Expression::Bool(
-                (funcs.make_bool)(x, state.next_lit_id, state.total),
+                (funcs.make_bool)(*x, state.next_lit_id, state.total),
                 state.next_lit_id,
             );
             if let Some(x) = state.next_lit_id.0.as_mut() {
@@ -257,19 +273,13 @@ fn make_expression<IntType, FloatType, BoolType>(
             };
             output
         }
-        crate::parser::Expression::FunctionApplication {
-            ref func_name,
-            ref args,
-        } => {
-            let func_name = func_name.to_string();
-            let can_diff = func_name == "__len" || differentiable;
-
-            Expression::FuncApplication {
-                func_name: Identifier(func_name),
+        crate::parser::Expression::FunctionApplicationMultipleArgs { ref func, ref args } => {
+            Expression::FuncApplicationMultipleArgs {
+                func: Box::new(make_expression(state, funcs, &func, true)),
                 args: args
                     .clone()
                     .into_iter()
-                    .map(|x| make_expression(state, funcs, x, can_diff))
+                    .map(|x| make_expression(state, funcs, &x, true))
                     .collect(),
             }
         }
@@ -279,60 +289,74 @@ fn make_expression<IntType, FloatType, BoolType>(
                 .into_iter()
                 .map(|x| LetBind {
                     ident: Identifier(x.name.to_string()),
-                    value: make_expression(state, funcs, *x.value, differentiable),
+                    value: make_expression(state, funcs, &x.value, differentiable),
                 })
                 .collect();
 
             Expression::ExprWhere {
                 bindings,
-                inner: Box::new(make_expression(state, funcs, *inner, differentiable)),
+                inner: Box::new(make_expression(state, funcs, &inner, differentiable)),
             }
         }
-        crate::parser::Expression::IfThenElse {
-            boolean,
-            true_expr,
-            false_expr,
-        } => Expression::IfThenElse {
-            boolean: Box::new(make_expression(state, funcs, *boolean, differentiable)),
-            true_expr: Box::new(make_expression(state, funcs, *true_expr, differentiable)),
-            false_expr: Box::new(make_expression(state, funcs, *false_expr, differentiable)),
+        crate::parser::Expression::DependentProductType {
+            type_first,
+            type_second,
+        } => Expression::DependentProductType {
+            type_first: Box::new(make_argument(state, funcs, type_first, differentiable)),
+            type_second: Box::new(make_expression(state, funcs, type_second, differentiable)),
         },
-        crate::parser::Expression::Product(x) => Expression::Product(
-            x.values
-                .into_iter()
-                .map(|x| make_expression(state, funcs, x, differentiable))
-                .collect(),
-        ),
-        crate::parser::Expression::UniverseLit(x) => Expression::Universe(x),
+        crate::parser::Expression::DependentFunctionType { type_from, type_to } => {
+            Expression::DependentFunctionType {
+                type_from: Box::new(make_argument(state, funcs, type_from, differentiable)),
+                type_to: Box::new(make_expression(state, funcs, type_to, differentiable)),
+            }
+        }
+        crate::parser::Expression::UniverseLit(x) => Expression::Universe(*x),
+        crate::parser::Expression::Lambda { input, body } => Expression::Lambda {
+            input: Identifier(input.clone()),
+            body: Box::new(make_expression(state, funcs, body, differentiable)),
+        },
+    }
+}
+
+fn make_argument<IntType, FloatType, BoolType>(
+    state: &mut AstConversionState,
+    funcs: &ProgramInitFunctions<IntType, FloatType, BoolType>,
+    value: &crate::parser::Argument,
+    differentiable: bool,
+) -> Argument<IntType, FloatType, BoolType> {
+    Argument {
+        name: Identifier(value.varname.clone()),
+        value: make_expression(state, funcs, &value.vartype, differentiable),
     }
 }
 
 fn make_gadt<IntType, FloatType, BoolType>(
     state: &mut AstConversionState,
     funcs: &ProgramInitFunctions<IntType, FloatType, BoolType>,
-    value: crate::parser::GadtDefinition,
+    value: &crate::parser::GadtDefinition,
     differentiable: bool,
 ) -> GadtDefinition<IntType, FloatType, BoolType> {
     GadtDefinition {
-        name: Identifier(value.name),
+        name: Identifier(value.name.clone()),
         universe: value.universe,
         arguments: value
             .arguments
-            .into_iter()
-            .map(|x: crate::parser::Argument| {
+            .iter()
+            .map(|x: &crate::parser::Argument| {
                 (
                     Identifier(x.varname.to_string()),
-                    make_expression(state, funcs, x.vartype, differentiable),
+                    make_expression(state, funcs, &x.vartype, differentiable),
                 )
             })
             .collect(),
         constructors: value
             .constructors
-            .into_iter()
-            .map(|x: crate::parser::Argument| {
+            .iter()
+            .map(|x: &crate::parser::Argument| {
                 (
                     Identifier(x.varname.to_string()),
-                    make_expression(state, funcs, x.vartype, differentiable),
+                    make_expression(state, funcs, &x.vartype, differentiable),
                 )
             })
             .collect(),

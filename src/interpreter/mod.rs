@@ -17,9 +17,6 @@ fn make_float(x: f64, _: ast::LitId, _: usize) -> f64 {
 fn make_bool(x: bool, _: ast::LitId, _: usize) -> bool {
     x
 }
-fn make_hard(x: i64) -> i64 {
-    x
-}
 
 pub struct HardEvaluator {}
 

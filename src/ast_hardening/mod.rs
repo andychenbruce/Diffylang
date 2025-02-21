@@ -6,17 +6,17 @@ pub fn harden_ast(
     soft_tree: crate::ast::Program<SoftInt, SoftFloat, SoftBool>,
 ) -> crate::ast::Program<i64, f64, bool> {
     crate::ast::Program {
-        functions: harden_functions(soft_tree.functions),
+        global_bindings: harden_globals(soft_tree.global_bindings),
         test_cases: soft_tree.test_cases.into_iter().map(harden_expr).collect(),
         gadts: harden_gadts(soft_tree.gadts),
         num_ids: soft_tree.num_ids,
     }
 }
 
-fn harden_functions(
-    functions: Vec<crate::ast::FunctionDefinition<SoftInt, SoftFloat, SoftBool>>,
-) -> Vec<crate::ast::FunctionDefinition<i64, f64, bool>> {
-    functions.into_iter().map(harden_function).collect()
+fn harden_globals(
+    functions: Vec<crate::ast::Binding<SoftInt, SoftFloat, SoftBool>>,
+) -> Vec<crate::ast::Binding<i64, f64, bool>> {
+    functions.into_iter().map(harden_global).collect()
 }
 
 fn harden_gadts(
@@ -44,19 +44,27 @@ fn harden_gadt(
     }
 }
 
-fn harden_function(
-    function: crate::ast::FunctionDefinition<SoftInt, SoftFloat, SoftBool>,
-) -> crate::ast::FunctionDefinition<i64, f64, bool> {
-    crate::ast::FunctionDefinition {
-        name: function.name,
-        universe: function.universe,
-        arguments: function
-            .arguments
-            .into_iter()
-            .map(|(ident, expr)| (ident, harden_expr(expr)))
-            .collect(),
-        to_type: harden_expr(function.to_type),
-        body: harden_expr(function.body),
+fn harden_global(
+    binding: crate::ast::Binding<SoftInt, SoftFloat, SoftBool>,
+) -> crate::ast::Binding<i64, f64, bool> {
+    crate::ast::Binding {
+        name: binding.name,
+        elem_type: harden_expr(binding.elem_type),
+        value: match binding.value {
+            crate::ast::Definition::Instrinsic => crate::ast::Definition::Instrinsic,
+            crate::ast::Definition::Evaluatable(expression) => {
+                crate::ast::Definition::Evaluatable(harden_expr(expression))
+            }
+        },
+    }
+}
+
+fn harden_argument(
+    arg: crate::ast::Argument<SoftInt, SoftFloat, SoftBool>,
+) -> crate::ast::Argument<i64, f64, bool> {
+    crate::ast::Argument {
+        name: arg.name,
+        value: harden_expr(arg.value),
     }
 }
 
@@ -70,9 +78,9 @@ fn harden_expr(
         }
         crate::ast::Expression::Float(x, n) => crate::ast::Expression::Float(x.val, n),
         crate::ast::Expression::Bool(x, n) => crate::ast::Expression::Bool(x.val > 0.5, n),
-        crate::ast::Expression::FuncApplication { func_name, args } => {
-            crate::ast::Expression::FuncApplication {
-                func_name,
+        crate::ast::Expression::FuncApplicationMultipleArgs { func, args } => {
+            crate::ast::Expression::FuncApplicationMultipleArgs {
+                func: Box::new(harden_expr(*func)),
                 args: args.into_iter().map(harden_expr).collect(),
             }
         }
@@ -88,18 +96,23 @@ fn harden_expr(
                 inner: Box::new(harden_expr(*inner)),
             }
         }
-        crate::ast::Expression::IfThenElse {
-            boolean,
-            true_expr,
-            false_expr,
-        } => crate::ast::Expression::IfThenElse {
-            boolean: Box::new(harden_expr(*boolean)),
-            true_expr: Box::new(harden_expr(*true_expr)),
-            false_expr: Box::new(harden_expr(*false_expr)),
+        crate::ast::Expression::DependentProductType {
+            type_first,
+            type_second,
+        } => crate::ast::Expression::DependentProductType {
+            type_first: Box::new(harden_argument(*type_first)),
+            type_second: Box::new(harden_expr(*type_second)),
         },
-        crate::ast::Expression::Product(values) => {
-            crate::ast::Expression::Product(values.into_iter().map(harden_expr).collect())
-        }
         crate::ast::Expression::Universe(x) => crate::ast::Expression::Universe(x),
+        crate::ast::Expression::DependentFunctionType { type_from, type_to } => {
+            crate::ast::Expression::DependentFunctionType {
+                type_from: Box::new(harden_argument(*type_from)),
+                type_to: Box::new(harden_expr(*type_to)),
+            }
+        }
+        crate::ast::Expression::Lambda { input, body } => crate::ast::Expression::Lambda {
+            input,
+            body: Box::new(harden_expr(*body)),
+        },
     }
 }

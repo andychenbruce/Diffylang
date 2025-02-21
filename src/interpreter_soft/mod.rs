@@ -2,7 +2,7 @@ use crate::ast;
 // use statrs::distribution::Continuous;
 // use statrs::distribution::ContinuousCDF;
 
-pub type SoftValue = ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool>;
+//pub type SoftValue = ast::eval::EvalVal<SoftInt, SoftFloat, SoftBool>;
 
 pub const SOFT_AST_INIT: ast::ProgramInitFunctions<SoftInt, SoftFloat, SoftBool> =
     ast::ProgramInitFunctions {
@@ -30,10 +30,6 @@ pub fn make_bool(x: bool, lit: ast::LitId, num_ids: usize) -> SoftBool {
         val: if x { 1.0 } else { 0.0 },
         gradient: make_oneshot(num_ids, lit),
     }
-}
-
-pub fn make_hard(x: i64) -> i64 {
-    x
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -124,8 +120,13 @@ pub fn apply_gradient_program(
     program: &mut ast::Program<SoftInt, SoftFloat, SoftBool>,
     grad: &Gradient,
 ) {
-    for function in program.functions.iter_mut() {
-        apply_gradient_expr(&mut function.body, grad);
+    for binding in program.global_bindings.iter_mut() {
+        match &mut binding.value {
+            ast::Definition::Instrinsic => {}
+            ast::Definition::Evaluatable(expression) => {
+                apply_gradient_expr(expression, grad);
+            }
+        }
     }
 }
 
@@ -134,7 +135,8 @@ fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>,
         ast::Expression::Integer(val, id) => val.val += grad.values[id.0.unwrap()],
         ast::Expression::Float(val, id) => val.val += grad.values[id.0.unwrap()],
         ast::Expression::Bool(val, id) => val.val += grad.values[id.0.unwrap()],
-        ast::Expression::FuncApplication { func_name: _, args } => {
+        ast::Expression::FuncApplicationMultipleArgs { func, args } => {
+            apply_gradient_expr(func, grad);
             for arg in args {
                 apply_gradient_expr(arg, grad);
             }
@@ -146,22 +148,20 @@ fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>,
 
             apply_gradient_expr(inner, grad);
         }
-        ast::Expression::Product(vals) => {
-            for val in vals {
-                apply_gradient_expr(val, grad);
-            }
-        }
-        ast::Expression::IfThenElse {
-            boolean,
-            true_expr,
-            false_expr,
+        ast::Expression::DependentProductType {
+            type_first,
+            type_second,
         } => {
-            apply_gradient_expr(boolean, grad);
-            apply_gradient_expr(true_expr, grad);
-            apply_gradient_expr(false_expr, grad);
+            apply_gradient_expr(&mut type_first.value, grad);
+            apply_gradient_expr(type_second, grad);
         }
         ast::Expression::Variable { ident: _ } => {}
         ast::Expression::Universe(_) => {}
+        ast::Expression::DependentFunctionType { type_from, type_to } => {
+            apply_gradient_expr(&mut type_from.value, grad);
+            apply_gradient_expr(type_to, grad);
+        }
+        ast::Expression::Lambda { input: _, body } => apply_gradient_expr(body, grad),
     }
 }
 
@@ -366,16 +366,6 @@ impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool> for SoftEvaluator
                     val: true_weighted.val + false_weighted.val,
                     gradient: true_weighted.gradient + false_weighted.gradient,
                 })
-            }
-            (ast::eval::EvalVal::Product(a), ast::eval::EvalVal::Product(b)) => {
-                assert!(a.len() == b.len());
-
-                ast::eval::EvalVal::Product(
-                    a.into_iter()
-                        .zip(b)
-                        .map(|(a_val, b_val)| self.eval_if(cond.clone(), a_val, b_val))
-                        .collect(),
-                )
             }
             _ => todo!(),
         }
