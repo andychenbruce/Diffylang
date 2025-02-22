@@ -582,8 +582,29 @@ fn get_free_variables<
                 .map(|x| x.clone())
                 .collect()
         }
-        super::Expression::ExprLetBinding { bindings, inner } => todo!(),
-        super::Expression::Lambda { input, body } => todo!(),
+        super::Expression::ExprLetBinding { bindings, inner } => {
+            let binding_free_vars = get_let_binds_free_vars(bindings.as_slice());
+            let mut body_free_vars = get_free_variables(inner);
+
+            for binding in bindings {
+                assert!(
+                    body_free_vars.remove(&binding.ident),
+                    "let binding not used in body"
+                );
+            }
+
+            binding_free_vars
+                .union(&body_free_vars)
+                .map(|x| x.clone())
+                .collect()
+        }
+        super::Expression::Lambda { input, body } => {
+            let mut body_free_vars = get_free_variables(body);
+
+            assert!(body_free_vars.remove(input));
+
+            body_free_vars
+        }
     }
 }
 
@@ -655,5 +676,28 @@ where
 
             eval(evaluator, &new_env, expr)
         }
+    }
+}
+
+fn get_let_binds_free_vars<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+>(
+    bindings: &[super::LetBind<IntType, FloatType, BoolType>],
+) -> std::collections::HashSet<Identifier> {
+    match bindings.split_first() {
+        Some((first_binding, rest)) => {
+            let own_free_vars = get_free_variables(&first_binding.value);
+            let mut rest_free_vars = get_let_binds_free_vars::<IntType, FloatType, BoolType>(rest);
+
+            assert!(rest_free_vars.remove(&first_binding.ident));
+
+            own_free_vars
+                .union(&rest_free_vars)
+                .map(|x| x.clone())
+                .collect()
+        }
+        None => std::collections::HashSet::new(),
     }
 }
