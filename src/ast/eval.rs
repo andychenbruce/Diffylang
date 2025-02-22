@@ -5,7 +5,7 @@ pub enum EvalVal<IntType, FloatType, BoolType> {
     Bool(BoolType),
     Universe(u64),
     Lambda {
-        captured_environment: Box<EnvVars<IntType, FloatType, BoolType>>,
+        //captured_environment: Box<EnvVars<IntType, FloatType, BoolType>>,
         input: super::Identifier,
         expr: super::Expression<IntType, FloatType, BoolType>,
     },
@@ -65,17 +65,17 @@ pub enum BuiltinFunc<IntType, FloatType, BoolType> {
 }
 
 #[derive(Clone)]
-struct Env<'a, IntType, FloatType, BoolType> {
+struct Env<'a, 'b, IntType, FloatType, BoolType> {
     program: &'a super::Program<IntType, FloatType, BoolType>,
-    vars: EnvVars<IntType, FloatType, BoolType>,
+    vars: EnvVars<'b, IntType, FloatType, BoolType>,
 }
 
 #[derive(Clone, Debug)]
-pub enum EnvVars<IntType, FloatType, BoolType> {
+pub enum EnvVars<'a, IntType, FloatType, BoolType> {
     End,
     Rest {
         first: (super::Identifier, EvalVal<IntType, FloatType, BoolType>),
-        rest: Box<EnvVars<IntType, FloatType, BoolType>>,
+        rest: &'a EnvVars<'a, IntType, FloatType, BoolType>,
     },
 }
 
@@ -122,29 +122,45 @@ where
         vars: EnvVars::End,
     };
 
-    let func = env.lookup_expr(&super::Identifier(func_name.to_owned()));
-    apply_func_multiple_args::<IntType, FloatType, BoolType, E>(evaluator, env, func, arguments)
+    let func = env.lookup_expr(evaluator, &super::Identifier(func_name.to_owned()));
+    apply_func_multiple_args::<IntType, FloatType, BoolType, E>(evaluator, &env, func, arguments)
 }
 
+impl<
+        'a,
+        'b,
+        IntType: Clone + core::fmt::Debug,
+        FloatType: Clone + core::fmt::Debug,
+        BoolType: Clone + core::fmt::Debug,
+    > Env<'a, 'b, IntType, FloatType, BoolType>
+{
+    fn lookup_expr<E>(
+        &self,
+        evaluator: &E,
+        var_name: &super::Identifier,
+    ) -> EvalVal<IntType, FloatType, BoolType>
+    where
+        E: Evaluator<IntType, FloatType, BoolType>,
+    {
+        match self.vars.lookup(var_name) {
+            Some(x) => x,
+            None => {
+                for definition in self.program.global_bindings.iter() {
+                    if definition.name.0 == var_name.0 {
+                        return eval(evaluator, self, &definition.value);
+                    }
+                }
+                unreachable!()
+            }
+        }
+    }
+}
 impl<
         'a,
         IntType: Clone + core::fmt::Debug,
         FloatType: Clone + core::fmt::Debug,
         BoolType: Clone + core::fmt::Debug,
-    > Env<'a, IntType, FloatType, BoolType>
-{
-    fn lookup_expr(&self, var_name: &super::Identifier) -> EvalVal<IntType, FloatType, BoolType> {
-        match self.vars.lookup(var_name) {
-            Some(x) => x,
-            None => todo!(),
-        }
-    }
-}
-impl<
-        IntType: Clone + core::fmt::Debug,
-        FloatType: Clone + core::fmt::Debug,
-        BoolType: Clone + core::fmt::Debug,
-    > EnvVars<IntType, FloatType, BoolType>
+    > EnvVars<'a, IntType, FloatType, BoolType>
 {
     fn lookup(
         &self,
@@ -184,77 +200,56 @@ impl<
 
 fn eval<
     'a,
+    'b,
     IntType: Clone + core::fmt::Debug,
     FloatType: Clone + core::fmt::Debug,
     BoolType: Clone + core::fmt::Debug,
     E,
 >(
     evaluator: &E,
-    env: Env<'a, IntType, FloatType, BoolType>,
+    env: &Env<'a, 'b, IntType, FloatType, BoolType>,
     expr: &super::Expression<IntType, FloatType, BoolType>,
 ) -> EvalVal<IntType, FloatType, BoolType>
 where
     E: Evaluator<IntType, FloatType, BoolType>,
 {
     match expr {
-        super::Expression::Variable { ident } => env.lookup_expr(ident),
+        super::Expression::Variable { ident } => env.lookup_expr(evaluator, ident),
         super::Expression::Integer(x, _) => EvalVal::Int(x.clone()),
         super::Expression::Float(x, _) => EvalVal::Float(x.clone()),
         super::Expression::Bool(x, _) => EvalVal::Bool(x.clone()),
         super::Expression::Universe(x) => EvalVal::Universe(*x),
 
         super::Expression::FuncApplicationMultipleArgs { func, args } => {
-            let func_val = eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), func);
+            let func_val = eval::<IntType, FloatType, BoolType, E>(evaluator, env, func);
 
             let args_val = args
                 .iter()
-                .map(|x| eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), x))
+                .map(|x| eval::<IntType, FloatType, BoolType, E>(evaluator, env, x))
                 .collect();
 
             apply_func_multiple_args(evaluator, env, func_val, args_val)
         }
-        super::Expression::ExprWhere { bindings, inner } => {
-            let new_env = bindings.iter().fold(env.vars, |acc, x| EnvVars::Rest {
-                first: (
-                    x.ident.clone(),
-                    eval::<IntType, FloatType, BoolType, E>(
-                        evaluator,
-                        Env {
-                            program: env.program,
-                            vars: acc.clone(),
-                        },
-                        &x.value,
-                    ),
-                ),
-                rest: Box::new(acc),
-            });
-
-            eval::<IntType, FloatType, BoolType, E>(
-                evaluator,
-                Env {
-                    program: env.program,
-                    vars: new_env,
-                },
-                inner,
-            )
+        super::Expression::ExprLetBinding { bindings, inner } => {
+            eval_let_binding(evaluator, env, bindings, inner)
         }
         super::Expression::DependentProductType {
             type_first,
             type_second,
         } => {
             let first_type =
-                eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), &type_first.arg_type);
+                eval::<IntType, FloatType, BoolType, E>(evaluator, env, &type_first.arg_type);
 
             let new_env: Env<IntType, FloatType, BoolType> = Env {
                 program: env.program,
                 vars: EnvVars::Rest {
                     first: (type_first.name.clone(), first_type.clone()),
-                    rest: Box::new(env.vars.clone()),
+                    rest: &env.vars,
                 },
             };
 
             let second_type =
-                eval::<IntType, FloatType, BoolType, E>(evaluator, new_env, type_second);
+                eval::<IntType, FloatType, BoolType, E>(evaluator, &new_env, type_second);
 
             EvalVal::DependentProductType {
                 first_type: Box::new(first_type),
@@ -263,17 +258,17 @@ where
         }
         super::Expression::DependentFunctionType { type_from, type_to } => {
             let from_type =
-                eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), &type_from.arg_type);
+                eval::<IntType, FloatType, BoolType, E>(evaluator, env, &type_from.arg_type);
 
             let new_env: Env<IntType, FloatType, BoolType> = Env {
                 program: env.program,
                 vars: EnvVars::Rest {
                     first: (type_from.name.clone(), from_type.clone()),
-                    rest: Box::new(env.vars.clone()),
+                    rest: &env.vars,
                 },
             };
 
-            let to_type = eval::<IntType, FloatType, BoolType, E>(evaluator, new_env, type_to);
+            let to_type = eval::<IntType, FloatType, BoolType, E>(evaluator, &new_env, type_to);
 
             EvalVal::DependentFunctionType {
                 type_from: Box::new(from_type),
@@ -281,6 +276,7 @@ where
             }
         }
         super::Expression::Lambda { input: _, body: _ } => todo!(),
+        super::Expression::Intrinsic => todo!(),
     }
 }
 
@@ -302,7 +298,7 @@ where
         .map(|test_case| {
             match crate::ast::eval::eval::<IntType, FloatType, BoolType, E>(
                 evaluator,
-                Env {
+                &Env {
                     program,
                     vars: EnvVars::End,
                 },
@@ -322,7 +318,7 @@ fn apply_func<
     E,
 >(
     evaluator: &E,
-    env: Env<IntType, FloatType, BoolType>,
+    _env: Env<IntType, FloatType, BoolType>,
     func: EvalVal<IntType, FloatType, BoolType>,
     arg: EvalVal<IntType, FloatType, BoolType>,
 ) -> EvalVal<IntType, FloatType, BoolType>
@@ -331,7 +327,7 @@ where
 {
     match func {
         EvalVal::Lambda {
-            captured_environment: _,
+            // captured_environment: _,
             input: _,
             expr: _,
         } => {
@@ -474,7 +470,7 @@ fn apply_func_multiple_args<
     E,
 >(
     evaluator: &E,
-    env: Env<IntType, FloatType, BoolType>,
+    env: &Env<IntType, FloatType, BoolType>,
     func: EvalVal<IntType, FloatType, BoolType>,
     args: Vec<EvalVal<IntType, FloatType, BoolType>>,
 ) -> EvalVal<IntType, FloatType, BoolType>
@@ -487,4 +483,37 @@ where
         .fold(first_app, |func_curried, next_arg| {
             apply_func(evaluator, env.clone(), func_curried, next_arg)
         })
+}
+
+fn eval_let_binding<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+    E,
+>(
+    evaluator: &E,
+    env: &Env<IntType, FloatType, BoolType>,
+    bindings: &[super::LetBind<IntType, FloatType, BoolType>],
+    inner: &super::Expression<IntType, FloatType, BoolType>,
+) -> EvalVal<IntType, FloatType, BoolType>
+where
+    E: Evaluator<IntType, FloatType, BoolType>,
+{
+    match bindings.split_first() {
+        Some((first_bind, rest_bind)) => {
+            let new_env = Env {
+                program: env.program,
+                vars: EnvVars::Rest {
+                    first: (
+                        first_bind.ident.clone(),
+                        eval(evaluator, env, &first_bind.value),
+                    ),
+                    rest: &env.vars,
+                },
+            };
+
+            eval_let_binding(evaluator, &new_env, rest_bind, inner)
+        }
+        None => eval(evaluator, env, inner),
+    }
 }

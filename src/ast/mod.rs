@@ -45,13 +45,7 @@ pub struct GadtDefinition<IntType, FloatType, BoolType> {
 pub struct Binding<IntType, FloatType, BoolType> {
     pub name: Identifier,
     pub elem_type: Expression<IntType, FloatType, BoolType>,
-    pub value: Definition<IntType, FloatType, BoolType>,
-}
-
-#[derive(serde::Serialize, Clone)]
-pub enum Definition<IntType, FloatType, BoolType> {
-    Instrinsic,
-    Evaluatable(Expression<IntType, FloatType, BoolType>),
+    pub value: Expression<IntType, FloatType, BoolType>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -65,6 +59,7 @@ pub struct LitId(pub Option<usize>);
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub enum Expression<IntType, FloatType, BoolType> {
+    Intrinsic,
     Variable {
         ident: Identifier,
     },
@@ -85,7 +80,7 @@ pub enum Expression<IntType, FloatType, BoolType> {
         func: Box<Expression<IntType, FloatType, BoolType>>,
         args: Vec<Expression<IntType, FloatType, BoolType>>,
     },
-    ExprWhere {
+    ExprLetBinding {
         bindings: Vec<LetBind<IntType, FloatType, BoolType>>,
         inner: Box<Expression<IntType, FloatType, BoolType>>,
     },
@@ -209,7 +204,7 @@ where
             gadt.constructors.iter().map(|x| Binding {
                 name: x.name.clone(),
                 elem_type: x.arg_type.clone(),
-                value: Definition::Instrinsic,
+                value: Expression::Intrinsic,
             })
         })
         .collect();
@@ -230,7 +225,7 @@ fn make_definition<IntType, FloatType, BoolType>(
     Binding {
         name: Identifier(value.name.clone()),
         elem_type: make_expression(state, funcs, &value.binding_type, true),
-        value: Definition::Evaluatable(make_expression(state, funcs, &value.func_body, true)),
+        value: make_expression(state, funcs, &value.func_body, true),
     }
 }
 
@@ -299,7 +294,7 @@ fn make_expression<IntType, FloatType, BoolType>(
                 })
                 .collect();
 
-            Expression::ExprWhere {
+            Expression::ExprLetBinding {
                 bindings,
                 inner: Box::new(make_expression(state, funcs, &inner, differentiable)),
             }

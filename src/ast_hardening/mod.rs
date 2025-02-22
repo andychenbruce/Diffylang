@@ -56,12 +56,7 @@ fn harden_global(
     crate::ast::Binding {
         name: binding.name,
         elem_type: harden_expr(binding.elem_type),
-        value: match binding.value {
-            crate::ast::Definition::Instrinsic => crate::ast::Definition::Instrinsic,
-            crate::ast::Definition::Evaluatable(expression) => {
-                crate::ast::Definition::Evaluatable(harden_expr(expression))
-            }
-        },
+        value: harden_expr(binding.value)
     }
 }
 
@@ -90,8 +85,8 @@ fn harden_expr(
                 args: args.into_iter().map(harden_expr).collect(),
             }
         }
-        crate::ast::Expression::ExprWhere { bindings, inner } => {
-            crate::ast::Expression::ExprWhere {
+        crate::ast::Expression::ExprLetBinding { bindings, inner } => {
+            crate::ast::Expression::ExprLetBinding {
                 bindings: bindings
                     .into_iter()
                     .map(|binding| crate::ast::LetBind {
@@ -120,5 +115,6 @@ fn harden_expr(
             input,
             body: Box::new(harden_expr(*body)),
         },
+        crate::ast::Expression::Intrinsic => {crate::ast::Expression::Intrinsic}
     }
 }

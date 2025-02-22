@@ -121,12 +121,7 @@ pub fn apply_gradient_program(
     grad: &Gradient,
 ) {
     for binding in program.global_bindings.iter_mut() {
-        match &mut binding.value {
-            ast::Definition::Instrinsic => {}
-            ast::Definition::Evaluatable(expression) => {
-                apply_gradient_expr(expression, grad);
-            }
-        }
+        apply_gradient_expr(&mut binding.value, grad);
     }
 }
 
@@ -141,7 +136,7 @@ fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>,
                 apply_gradient_expr(arg, grad);
             }
         }
-        ast::Expression::ExprWhere { bindings, inner } => {
+        ast::Expression::ExprLetBinding { bindings, inner } => {
             for binding in bindings {
                 apply_gradient_expr(&mut binding.value, grad);
             }
@@ -162,6 +157,7 @@ fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>,
             apply_gradient_expr(type_to, grad);
         }
         ast::Expression::Lambda { input: _, body } => apply_gradient_expr(body, grad),
+        ast::Expression::Intrinsic => {}
     }
 }
 
