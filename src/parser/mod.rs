@@ -2,9 +2,9 @@
 
 #[derive(Debug)]
 pub struct ParseError {
-    pos_start: ParsePos,
-    pos_end: ParsePos,
-    reason: ParseErrorReason,
+    pub pos_start: ParsePos,
+    pub pos_end: ParsePos,
+    pub reason: ParseErrorReason,
 }
 
 #[derive(Debug)]
@@ -19,7 +19,6 @@ pub enum ParseErrorReason {
     ExpectedUniverse,
     ExpectedArgs,
     ExpectedConstructors,
-    ExpectedType,
     ExpectedExpression,
     ExpectedTypeExpression,
     VariableNameIsKeyword,
@@ -54,9 +53,9 @@ enum TokenVal {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ParsePos {
-    col: usize,
-    line: usize,
+pub struct ParsePos {
+    pub col: usize,
+    pub line: usize,
 }
 
 struct Token {
@@ -431,6 +430,13 @@ fn parse_universe(token_tree: &TokenTree) -> Result<u64, ParseError> {
 }
 
 fn parse_leaf_name(s: &str) -> Expression {
+    if s == "true" {
+        return Expression::BoolLit(true);
+    }
+    if s == "false" {
+        return Expression::BoolLit(false);
+    }
+
     if s.chars().next().unwrap().is_ascii_digit() {
         let (indicie, _) = s.char_indices().last().unwrap();
         match s.split_at(indicie) {
@@ -489,6 +495,45 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                         Ok(Expression::LetBinds {
                             bindings: let_bindings,
                             inner: Box::new(inner),
+                        })
+                    }
+                    TokenNonParen::Lambda => todo!(),
+                    TokenNonParen::Pi => {
+                        let from_type: Argument =
+                            parse_arg(sub_trees.get(1).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedArgs,
+                            })?)?;
+                        let to_type: Expression =
+                            parse_expr(sub_trees.get(2).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedExpression,
+                            })?)?;
+
+                        Ok(Expression::DependentFunctionType {
+                            type_from: Box::new(from_type),
+                            type_to: Box::new(to_type),
+                        })
+                    }
+                    TokenNonParen::Sigma => {
+                        let first_type: Argument =
+                            parse_arg(sub_trees.get(1).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedArgs,
+                            })?)?;
+                        let second_type: Expression =
+                            parse_expr(sub_trees.get(2).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedExpression,
+                            })?)?;
+
+                        Ok(Expression::DependentProductType {
+                            type_first: Box::new(first_type),
+                            type_second: Box::new(second_type),
                         })
                     }
                     _ => Err(ParseError {

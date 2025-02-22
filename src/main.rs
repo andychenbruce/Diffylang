@@ -11,7 +11,44 @@ fn main() {
         .get(1)
         .unwrap_or_else(|| panic!("usage: {} FILENAME [FUNC NAME] [ARGS ...]", args[0]));
 
-    let program_parsed_tree = parser::parse_program_from_file(filename).unwrap();
+    let program_parsed_tree = match parser::parse_program_from_file(filename) {
+        Ok(x) => x,
+        Err(err) => {
+            for (line_num, line) in std::fs::read_to_string(filename)
+                .unwrap()
+                .lines()
+                .enumerate()
+            {
+                assert!(err.pos_start.line == err.pos_end.line);
+
+                if line_num + 1 == err.pos_start.line {
+                    println!("{}", line);
+                }
+                if line_num == err.pos_start.line {
+                    println!("{}", line);
+                    for _ in 0..err.pos_start.col {
+                        print!(" ");
+                    }
+                    for _ in err.pos_start.col..err.pos_end.col {
+                        print!("^");
+                    }
+                    println!();
+                    for _ in 0..err.pos_start.col {
+                        print!(" ");
+                    }
+                    println!("{:?}", err.reason);
+                    println!();
+                }
+                if line_num > 0 {
+                    if line_num - 1 == err.pos_start.line {
+                        println!("{}", line);
+                    }
+                }
+            }
+
+            std::process::exit(1)
+        }
+    };
     let program = ast::make_program(&program_parsed_tree, interpreter::HARD_AST_INIT);
 
     match args.get(2) {
