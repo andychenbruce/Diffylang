@@ -1,7 +1,7 @@
 pub mod eval;
 pub mod type_check;
 
-#[derive(serde::Serialize, Clone, Debug)]
+#[derive(serde::Serialize, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Identifier(pub String);
 
 #[derive(serde::Serialize, Clone, Debug)]

@@ -1,3 +1,5 @@
+use super::Identifier;
+
 #[derive(Clone, Debug)]
 pub enum EvalVal<IntType, FloatType, BoolType> {
     Int(IntType),
@@ -5,7 +7,8 @@ pub enum EvalVal<IntType, FloatType, BoolType> {
     Bool(BoolType),
     Universe(u64),
     Lambda {
-        //captured_environment: Box<EnvVars<IntType, FloatType, BoolType>>,
+        captured_free_variables:
+            std::collections::HashMap<Identifier, EvalVal<IntType, FloatType, BoolType>>,
         input: super::Identifier,
         expr: super::Expression<IntType, FloatType, BoolType>,
     },
@@ -150,7 +153,7 @@ impl<
                         return eval(evaluator, self, &definition.value);
                     }
                 }
-                unreachable!()
+                unreachable!("couldn't lookup {}", var_name.0)
             }
         }
     }
@@ -275,7 +278,26 @@ where
                 type_to: Box::new(to_type),
             }
         }
-        super::Expression::Lambda { input: _, body: _ } => todo!(),
+        super::Expression::Lambda { input, body } => {
+            let mut free_variables = get_free_variables(body);
+            assert!(
+                free_variables.remove(input),
+                "Lambda doesn't even use input, technically valid just in case"
+            );
+
+            let mut captured_free_variables = std::collections::HashMap::new();
+
+            for free_var in free_variables.iter() {
+                let free_var_value = env.lookup_expr(evaluator, free_var);
+                captured_free_variables.insert(free_var.clone(), free_var_value);
+            }
+
+            EvalVal::Lambda {
+                captured_free_variables,
+                input: input.clone(),
+                expr: *body.clone(),
+            }
+        }
         super::Expression::Intrinsic => todo!(),
     }
 }
@@ -318,7 +340,7 @@ fn apply_func<
     E,
 >(
     evaluator: &E,
-    _env: Env<IntType, FloatType, BoolType>,
+    env: Env<IntType, FloatType, BoolType>,
     func: EvalVal<IntType, FloatType, BoolType>,
     arg: EvalVal<IntType, FloatType, BoolType>,
 ) -> EvalVal<IntType, FloatType, BoolType>
@@ -327,12 +349,10 @@ where
 {
     match func {
         EvalVal::Lambda {
-            // captured_environment: _,
-            input: _,
-            expr: _,
-        } => {
-            todo!()
-        }
+            input,
+            expr,
+            captured_free_variables,
+        } => apply_lambda(evaluator, env, captured_free_variables, input, &expr, arg),
         EvalVal::BuiltinFunc(builtin_func) => match builtin_func {
             BuiltinFunc::AddInt => match arg {
                 EvalVal::Int(x) => EvalVal::BuiltinFunc(BuiltinFunc::PartialAppAddInt(x)),
@@ -515,5 +535,125 @@ where
             eval_let_binding(evaluator, &new_env, rest_bind, inner)
         }
         None => eval(evaluator, env, inner),
+    }
+}
+
+fn get_free_variables<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+>(
+    expr: &super::Expression<IntType, FloatType, BoolType>,
+) -> std::collections::HashSet<Identifier> {
+    match expr {
+        super::Expression::Intrinsic => std::collections::HashSet::new(),
+        super::Expression::Variable { ident } => [ident.clone()].into(),
+        super::Expression::DependentProductType {
+            type_first,
+            type_second,
+        } => get_free_variables(&type_first.arg_type)
+            .union(&get_free_variables(type_second))
+            .map(|x| x.clone())
+            .collect(),
+        super::Expression::DependentFunctionType { type_from, type_to } => {
+            get_free_variables(&type_from.arg_type)
+                .union(&get_free_variables(type_to))
+                .map(|x| x.clone())
+                .collect()
+        }
+        super::Expression::Integer(_, _) => std::collections::HashSet::new(),
+        super::Expression::Float(_, _) => std::collections::HashSet::new(),
+        super::Expression::Bool(_, _) => std::collections::HashSet::new(),
+        super::Expression::Universe(_) => std::collections::HashSet::new(),
+        super::Expression::FuncApplicationMultipleArgs { func, args } => {
+            let args_free_vars = args.iter().enumerate().fold(
+                std::collections::HashSet::new(),
+                |acc, (vars, index)| {
+                    acc.union(&get_free_variables(index))
+                        .map(|x| x.clone())
+                        .collect()
+                },
+            );
+
+            let function_free_vars = get_free_variables(func);
+
+            args_free_vars
+                .union(&function_free_vars)
+                .map(|x| x.clone())
+                .collect()
+        }
+        super::Expression::ExprLetBinding { bindings, inner } => todo!(),
+        super::Expression::Lambda { input, body } => todo!(),
+    }
+}
+
+fn apply_lambda<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+    E,
+>(
+    evaluator: &E,
+    env: Env<IntType, FloatType, BoolType>,
+    captured_free_variables: std::collections::HashMap<
+        Identifier,
+        EvalVal<IntType, FloatType, BoolType>,
+    >,
+    input: super::Identifier,
+    expr: &super::Expression<IntType, FloatType, BoolType>,
+    arg: EvalVal<IntType, FloatType, BoolType>,
+) -> EvalVal<IntType, FloatType, BoolType>
+where
+    E: Evaluator<IntType, FloatType, BoolType>,
+{
+    apply_lambda_inner(
+        evaluator,
+        env,
+        &captured_free_variables.into_iter().collect::<Vec<_>>(),
+        input,
+        expr,
+        arg,
+    )
+}
+
+fn apply_lambda_inner<
+    IntType: Clone + core::fmt::Debug,
+    FloatType: Clone + core::fmt::Debug,
+    BoolType: Clone + core::fmt::Debug,
+    E,
+>(
+    evaluator: &E,
+    env: Env<IntType, FloatType, BoolType>,
+    captured_free_variables: &[(Identifier, EvalVal<IntType, FloatType, BoolType>)],
+    input: super::Identifier,
+    expr: &super::Expression<IntType, FloatType, BoolType>,
+    arg: EvalVal<IntType, FloatType, BoolType>,
+) -> EvalVal<IntType, FloatType, BoolType>
+where
+    E: Evaluator<IntType, FloatType, BoolType>,
+{
+    match captured_free_variables.split_first() {
+        Some((first, rest)) => {
+            let new_env: Env<IntType, FloatType, BoolType> = Env {
+                program: env.program,
+                vars: EnvVars::Rest {
+                    first: first.clone(),
+                    rest: &env.vars,
+                },
+            };
+
+            apply_lambda_inner(evaluator, new_env, rest, input, expr, arg)
+        }
+        None => {
+            let new_env: Env<IntType, FloatType, BoolType> = Env {
+                program: env.program,
+                vars: EnvVars::Rest {
+                    first: (input.clone(), arg),
+                    rest: &env.vars,
+                },
+            };
+
+            eval(evaluator, &new_env, expr)
+        }
     }
 }

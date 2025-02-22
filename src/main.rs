@@ -88,7 +88,6 @@ fn main() {
                 &interpreter_soft::SoftEvaluator {
                     sigmoid_variance: 0.1,
                     equality_variance: 0.1,
-                    sigma_list: 0.1,
                 },
                 &soft_program,
             );

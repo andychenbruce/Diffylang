@@ -164,7 +164,6 @@ fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>,
 pub struct SoftEvaluator {
     pub sigmoid_variance: f64,
     pub equality_variance: f64,
-    pub sigma_list: f64,
 }
 
 impl crate::ast::eval::Evaluator<SoftInt, SoftFloat, SoftBool> for SoftEvaluator {
