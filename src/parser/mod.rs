@@ -65,9 +65,8 @@ struct Token {
 }
 
 struct CharIter<'a> {
-    chars: std::str::Chars<'a>,
+    chars: std::iter::Peekable<std::str::Chars<'a>>,
     pub curr_pos: ParsePos,
-    peek_cache: Option<Option<char>>,
 }
 
 struct Tokens<'a> {
@@ -78,9 +77,8 @@ impl<'a> Tokens<'a> {
     pub fn new(code: &'a str) -> Self {
         Self {
             char_iter: CharIter {
-                chars: code.chars(),
+                chars: code.chars().peekable(),
                 curr_pos: ParsePos { col: 0, line: 0 },
-                peek_cache: None,
             },
         }
     }
@@ -115,11 +113,6 @@ impl<'a> Tokens<'a> {
 impl<'a> Iterator for CharIter<'a> {
     type Item = char;
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(x) = self.peek_cache {
-            self.peek_cache = None;
-            return x;
-        }
-
         let next = self.chars.next();
         if let Some(next) = next {
             self.curr_pos.col += 1;
@@ -134,23 +127,16 @@ impl<'a> Iterator for CharIter<'a> {
 
 impl<'a> CharIter<'a> {
     fn peek(&mut self) -> Option<char> {
-        if let Some(x) = self.peek_cache {
-            return x;
-        }
-
-        let next = self.next();
-        self.peek_cache = Some(next);
-
-        return next;
+        self.chars.peek().map(|x| *x)
     }
     pub fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> Option<char> {
-        match self.next() {
-            Some(matched) if func(&matched) => Some(matched),
-            other => {
-                assert!(self.peek_cache.is_none());
-                self.peek_cache = Some(other);
-                None
+        match self.peek() {
+            Some(matched) if func(&matched) => {
+                let next = self.next();
+                assert!(next.unwrap() == matched);
+                Some(matched)
             }
+            _ => None,
         }
     }
 }
@@ -497,7 +483,24 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                             inner: Box::new(inner),
                         })
                     }
-                    TokenNonParen::Lambda => todo!(),
+                    TokenNonParen::Lambda => {
+                        let input_name: String =
+                            parse_name(sub_trees.get(1).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedName,
+                            })?)?;
+                        let body: Expression = parse_expr(sub_trees.get(2).ok_or(ParseError {
+                            pos_start: token_tree.start_pos,
+                            pos_end: token_tree.end_pos,
+                            reason: ParseErrorReason::ExpectedExpression,
+                        })?)?;
+
+                        Ok(Expression::Lambda {
+                            input: input_name,
+                            body: Box::new(body),
+                        })
+                    }
                     TokenNonParen::Pi => {
                         let from_type: Argument =
                             parse_arg(sub_trees.get(1).ok_or(ParseError {
@@ -723,11 +726,6 @@ pub enum Expression {
 pub struct LetBind {
     pub name: String,
     pub value: Box<Expression>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ProductType {
-    pub values: Vec<Expression>,
 }
 
 pub fn parse_program_from_file<P: AsRef<std::path::Path>>(

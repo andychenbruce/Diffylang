@@ -14,12 +14,16 @@ fn main() {
     let program_parsed_tree = match parser::parse_program_from_file(filename) {
         Ok(x) => x,
         Err(err) => {
+            println!("{:?}", err);
             for (line_num, line) in std::fs::read_to_string(filename)
                 .unwrap()
                 .lines()
                 .enumerate()
             {
-                assert!(err.pos_start.line == err.pos_end.line);
+                if err.pos_start.line != err.pos_end.line {
+                    todo!("print multi line errors")
+                }
+
 
                 if line_num + 1 == err.pos_start.line {
                     println!("{}", line);
