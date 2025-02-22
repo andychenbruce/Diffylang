@@ -7,3 +7,6 @@
    (: succ (-> Nat Nat))))
 
 (def add_one (Π (: _ int) int) (λ x (__add_int x 1i)))
+
+
+(def add_numbers (Π (: _ int) (Π (: _ int) int)) (λ x (λ y (__add_int x y))))
