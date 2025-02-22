@@ -6,4 +6,4 @@
   ((: zero Nat)
    (: succ (-> Nat Nat))))
 
-(def add_one (Π int int) (λ x (__add_int x 1i)))
+(def add_one (Π (: _ int) int) (λ x (__add_int x 1i)))

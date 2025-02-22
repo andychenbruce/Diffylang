@@ -15,12 +15,23 @@ pub enum ParseErrorReason {
     StrayAtom,
     EmptyDeclaration,
     ExpectedName,
+    ExpectedLambdaInputName,
     FunctionApplicationIsntName,
     ExpectedUniverse,
     ExpectedArgs,
     ExpectedConstructors,
     ExpectedExpression,
-    ExpectedTypeExpression,
+    ExpectedLambdaBodyExpression,
+    ExpectedTestCaseExpression,
+    ExpectedLetBindingExpression,
+    ExpectedDependentFunctionTypeToTypeExpression,
+    ExpectedDependentProductTypeSecondTypeExpression,
+    ExpectedDependentFunctionTypeArgument,
+    ExpectedArgTypeExpression,
+    ExpectedDependentProductTypeArgument,
+    ExpressionCantStartWithThis,
+    ExpectedDefinitionType,
+    ExpectedLetBindingBody,
     VariableNameIsKeyword,
     EmptyExpression,
     ExpectedBindings,
@@ -362,9 +373,9 @@ fn parse_def(
     let binding_type = parse_expr(vec.get(1).ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
-        reason: ParseErrorReason::ExpectedTypeExpression,
+        reason: ParseErrorReason::ExpectedDefinitionType,
     })?)?;
-    let body = parse_expr(vec.get(4).ok_or(ParseError {
+    let body = parse_expr(vec.get(2).ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedExpression,
@@ -381,10 +392,10 @@ fn parse_deftest(
     end_pos: ParsePos,
     vec: &[TokenTree],
 ) -> Result<Declaration, ParseError> {
-    let body = parse_expr(vec.get(4).ok_or(ParseError {
+    let body = parse_expr(vec.get(0).ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
-        reason: ParseErrorReason::ExpectedExpression,
+        reason: ParseErrorReason::ExpectedTestCaseExpression,
     })?)?;
 
     Ok(Declaration::TestCaseDef(body))
@@ -475,7 +486,7 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                             parse_expr(sub_trees.get(2).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedExpression,
+                                reason: ParseErrorReason::ExpectedLetBindingExpression,
                             })?)?;
 
                         Ok(Expression::LetBinds {
@@ -488,12 +499,12 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                             parse_name(sub_trees.get(1).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedName,
+                                reason: ParseErrorReason::ExpectedLambdaInputName,
                             })?)?;
                         let body: Expression = parse_expr(sub_trees.get(2).ok_or(ParseError {
                             pos_start: token_tree.start_pos,
                             pos_end: token_tree.end_pos,
-                            reason: ParseErrorReason::ExpectedExpression,
+                            reason: ParseErrorReason::ExpectedLambdaBodyExpression,
                         })?)?;
 
                         Ok(Expression::Lambda {
@@ -506,13 +517,13 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                             parse_arg(sub_trees.get(1).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedArgs,
+                                reason: ParseErrorReason::ExpectedDependentFunctionTypeArgument,
                             })?)?;
                         let to_type: Expression =
                             parse_expr(sub_trees.get(2).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedExpression,
+                                reason: ParseErrorReason::ExpectedDependentFunctionTypeToTypeExpression,
                             })?)?;
 
                         Ok(Expression::DependentFunctionType {
@@ -525,13 +536,13 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                             parse_arg(sub_trees.get(1).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedArgs,
+                                reason: ParseErrorReason::ExpectedDependentProductTypeArgument,
                             })?)?;
                         let second_type: Expression =
                             parse_expr(sub_trees.get(2).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedExpression,
+                                reason: ParseErrorReason::ExpectedDependentProductTypeSecondTypeExpression,
                             })?)?;
 
                         Ok(Expression::DependentProductType {
@@ -542,7 +553,7 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                     _ => Err(ParseError {
                         pos_start: token_tree.start_pos,
                         pos_end: token_tree.end_pos,
-                        reason: ParseErrorReason::ExpectedExpression,
+                        reason: ParseErrorReason::ExpressionCantStartWithThis,
                     }),
                 },
                 TokenTreeVal::Branch(_) => Err(ParseError {
@@ -582,7 +593,7 @@ fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, ParseError> {
             let body = parse_expr(vec.get(1).ok_or(ParseError {
                 pos_start: token_tree.start_pos,
                 pos_end: token_tree.end_pos,
-                reason: ParseErrorReason::ExpectedExpression,
+                reason: ParseErrorReason::ExpectedLetBindingBody,
             })?)?;
 
             return Ok(LetBind {
@@ -614,15 +625,15 @@ fn parse_arg(token_tree: &TokenTree) -> Result<Argument, ParseError> {
                 pos_end: token_tree.end_pos,
                 reason: ParseErrorReason::ExpectedName,
             })?)?;
-            let typename = parse_expr(vec.get(2).ok_or(ParseError {
+            let vartype = parse_expr(vec.get(2).ok_or(ParseError {
                 pos_start: token_tree.start_pos,
                 pos_end: token_tree.end_pos,
-                reason: ParseErrorReason::ExpectedExpression,
+                reason: ParseErrorReason::ExpectedArgTypeExpression,
             })?)?;
 
             Ok(Argument {
                 varname,
-                vartype: typename,
+                vartype,
             })
         }
         TokenTreeVal::Leaf(_) => Err(ParseError {
