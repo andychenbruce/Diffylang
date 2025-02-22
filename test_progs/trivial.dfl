@@ -6,7 +6,7 @@
   ((: zero Nat)
    (: succ (-> Nat Nat))))
 
-(def add_one (Π (: _ int) int) (λ x (__add_int x 1i)))
+(def add_one (Π (: _ int) int) (λ (: x int) (__add_int x 1i)))
 
 
-(def add_numbers (Π (: _ int) (Π (: _ int) int)) (λ x (λ y (__add_int x y))))
+(def add_numbers (Π (: _ int) (Π (: _ int) int)) (λ (: x int) (λ (: y int) (__add_int x y))))

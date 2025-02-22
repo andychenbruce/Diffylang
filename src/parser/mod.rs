@@ -15,10 +15,9 @@ pub enum ParseErrorReason {
     StrayAtom,
     EmptyDeclaration,
     ExpectedName,
-    ExpectedLambdaInputName,
+    ExpectedLambdaArgument,
     FunctionApplicationIsntName,
     ExpectedUniverse,
-    ExpectedArgs,
     ExpectedConstructors,
     ExpectedExpression,
     ExpectedLambdaBodyExpression,
@@ -336,17 +335,12 @@ fn parse_defgadt(
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedName,
     })?)?;
-    let universe: u64 = parse_universe(vec.get(1).ok_or(ParseError {
+    let gadt_type = parse_expr(vec.get(1).ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedUniverse,
     })?)?;
-    let args = parse_args(vec.get(2).ok_or(ParseError {
-        pos_start: start_pos,
-        pos_end: end_pos,
-        reason: ParseErrorReason::ExpectedArgs,
-    })?)?;
-    let constructors = parse_args(vec.get(3).ok_or(ParseError {
+    let constructors = parse_args(vec.get(2).ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedConstructors,
@@ -354,8 +348,7 @@ fn parse_defgadt(
 
     return Ok(Declaration::GadtDef(GadtDefinition {
         name,
-        universe,
-        arguments: args,
+        gadt_type,
         constructors,
     }));
 }
@@ -399,31 +392,6 @@ fn parse_deftest(
     })?)?;
 
     Ok(Declaration::TestCaseDef(body))
-}
-
-fn parse_universe(token_tree: &TokenTree) -> Result<u64, ParseError> {
-    match &token_tree.val {
-        TokenTreeVal::Leaf(x) => match x {
-            TokenNonParen::NonKeyword(universe_number) => match parse_leaf_name(universe_number) {
-                Expression::UniverseLit(x) => Ok(x),
-                _ => Err(ParseError {
-                    pos_start: token_tree.start_pos,
-                    pos_end: token_tree.end_pos,
-                    reason: ParseErrorReason::ExpectedUniverse,
-                }),
-            },
-            _ => Err(ParseError {
-                pos_start: token_tree.start_pos,
-                pos_end: token_tree.end_pos,
-                reason: ParseErrorReason::ExpectedUniverse,
-            }),
-        },
-        TokenTreeVal::Branch(_) => Err(ParseError {
-            pos_start: token_tree.start_pos,
-            pos_end: token_tree.end_pos,
-            reason: ParseErrorReason::ExpectedUniverse,
-        }),
-    }
 }
 
 fn parse_leaf_name(s: &str) -> Expression {
@@ -495,11 +463,11 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                         })
                     }
                     TokenNonParen::Lambda => {
-                        let input_name: String =
-                            parse_name(sub_trees.get(1).ok_or(ParseError {
+                        let input_name: Argument =
+                            parse_arg(sub_trees.get(1).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedLambdaInputName,
+                                reason: ParseErrorReason::ExpectedLambdaArgument,
                             })?)?;
                         let body: Expression = parse_expr(sub_trees.get(2).ok_or(ParseError {
                             pos_start: token_tree.start_pos,
@@ -508,7 +476,7 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                         })?)?;
 
                         Ok(Expression::Lambda {
-                            input: input_name,
+                            input: Box::new(input_name),
                             body: Box::new(body),
                         })
                     }
@@ -684,8 +652,7 @@ pub enum Declaration {
 #[derive(Clone, Debug)]
 pub struct GadtDefinition {
     pub name: String,
-    pub universe: u64,
-    pub arguments: Vec<Argument>,
+    pub gadt_type: Expression,
     pub constructors: Vec<Argument>,
 }
 
@@ -718,7 +685,7 @@ pub enum Expression {
     },
 
     Lambda {
-        input: String,
+        input: Box<Argument>,
         body: Box<Expression>,
     },
 

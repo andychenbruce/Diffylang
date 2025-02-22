@@ -281,7 +281,7 @@ where
         super::Expression::Lambda { input, body } => {
             let mut free_variables = get_free_variables(body);
             assert!(
-                free_variables.remove(input),
+                free_variables.remove(&input.name),
                 "Lambda doesn't even use input, technically valid just in case"
             );
 
@@ -294,7 +294,7 @@ where
 
             EvalVal::Lambda {
                 captured_free_variables,
-                input: input.clone(),
+                input: input.name.clone(),
                 expr: *body.clone(),
             }
         }
@@ -551,13 +551,25 @@ fn get_free_variables<
         super::Expression::DependentProductType {
             type_first,
             type_second,
-        } => get_free_variables(&type_first.arg_type)
-            .union(&get_free_variables(type_second))
-            .map(|x| x.clone())
-            .collect(),
+        } => {
+            let type_first_free_variables = get_free_variables(&type_first.arg_type);
+            let mut type_second_free_variables = get_free_variables(type_second);
+
+            type_second_free_variables.remove(&type_first.name);
+
+            type_first_free_variables
+                .union(&type_second_free_variables)
+                .map(|x| x.clone())
+                .collect()
+        }
         super::Expression::DependentFunctionType { type_from, type_to } => {
-            get_free_variables(&type_from.arg_type)
-                .union(&get_free_variables(type_to))
+            let type_from_free_variables = get_free_variables(&type_from.arg_type);
+            let mut type_to_free_variables = get_free_variables(type_to);
+
+            type_to_free_variables.remove(&type_from.name);
+
+            type_from_free_variables
+                .union(&type_to_free_variables)
                 .map(|x| x.clone())
                 .collect()
         }
@@ -566,14 +578,13 @@ fn get_free_variables<
         super::Expression::Bool(_, _) => std::collections::HashSet::new(),
         super::Expression::Universe(_) => std::collections::HashSet::new(),
         super::Expression::FuncApplicationMultipleArgs { func, args } => {
-            let args_free_vars = args.iter().enumerate().fold(
-                std::collections::HashSet::new(),
-                |acc, (vars, index)| {
-                    acc.union(&get_free_variables(index))
+            let args_free_vars = args
+                .iter()
+                .fold(std::collections::HashSet::new(), |acc, var| {
+                    acc.union(&get_free_variables(var))
                         .map(|x| x.clone())
                         .collect()
-                },
-            );
+                });
 
             let function_free_vars = get_free_variables(func);
 
@@ -601,7 +612,7 @@ fn get_free_variables<
         super::Expression::Lambda { input, body } => {
             let mut body_free_vars = get_free_variables(body);
 
-            assert!(body_free_vars.remove(input));
+            assert!(body_free_vars.remove(&input.name));
 
             body_free_vars
         }

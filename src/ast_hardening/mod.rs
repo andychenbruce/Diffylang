@@ -30,15 +30,7 @@ fn harden_gadt(
 ) -> crate::ast::GadtDefinition<i64, f64, bool> {
     crate::ast::GadtDefinition {
         name: gadt.name,
-        universe: gadt.universe,
-        arguments: gadt
-            .arguments
-            .into_iter()
-            .map(|arg| crate::ast::Argument {
-                name: arg.name,
-                arg_type: harden_expr(arg.arg_type),
-            })
-            .collect(),
+        gadt_type: harden_expr(gadt.gadt_type),
         constructors: gadt
             .constructors
             .into_iter()
@@ -56,7 +48,7 @@ fn harden_global(
     crate::ast::Binding {
         name: binding.name,
         elem_type: harden_expr(binding.elem_type),
-        value: harden_expr(binding.value)
+        value: harden_expr(binding.value),
     }
 }
 
@@ -112,9 +104,9 @@ fn harden_expr(
             }
         }
         crate::ast::Expression::Lambda { input, body } => crate::ast::Expression::Lambda {
-            input,
+            input: Box::new(harden_argument(*input)),
             body: Box::new(harden_expr(*body)),
         },
-        crate::ast::Expression::Intrinsic => {crate::ast::Expression::Intrinsic}
+        crate::ast::Expression::Intrinsic => crate::ast::Expression::Intrinsic,
     }
 }

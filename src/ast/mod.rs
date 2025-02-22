@@ -36,8 +36,7 @@ struct AstConversionState {
 #[derive(serde::Serialize, Clone)]
 pub struct GadtDefinition<IntType, FloatType, BoolType> {
     pub name: Identifier,
-    pub universe: u64,
-    pub arguments: Vec<Argument<IntType, FloatType, BoolType>>,
+    pub gadt_type: Expression<IntType, FloatType, BoolType>,
     pub constructors: Vec<Argument<IntType, FloatType, BoolType>>,
 }
 
@@ -86,7 +85,7 @@ pub enum Expression<IntType, FloatType, BoolType> {
     },
 
     Lambda {
-        input: Identifier,
+        input: Box<Argument<IntType, FloatType, BoolType>>,
         body: Box<Expression<IntType, FloatType, BoolType>>,
     },
 }
@@ -314,7 +313,7 @@ fn make_expression<IntType, FloatType, BoolType>(
         }
         crate::parser::Expression::UniverseLit(x) => Expression::Universe(*x),
         crate::parser::Expression::Lambda { input, body } => Expression::Lambda {
-            input: Identifier(input.clone()),
+            input: Box::new(make_argument(state, funcs, input, differentiable)),
             body: Box::new(make_expression(state, funcs, body, differentiable)),
         },
     }
@@ -340,15 +339,7 @@ fn make_gadt<IntType, FloatType, BoolType>(
 ) -> GadtDefinition<IntType, FloatType, BoolType> {
     GadtDefinition {
         name: Identifier(value.name.clone()),
-        universe: value.universe,
-        arguments: value
-            .arguments
-            .iter()
-            .map(|x: &crate::parser::Argument| Argument {
-                name: Identifier(x.varname.to_string()),
-                arg_type: make_expression(state, funcs, &x.vartype, differentiable),
-            })
-            .collect(),
+        gadt_type: make_expression(state, funcs, &value.gadt_type, differentiable),
         constructors: value
             .constructors
             .iter()
