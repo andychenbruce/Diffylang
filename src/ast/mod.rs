@@ -10,7 +10,7 @@ pub struct TypeName(pub String);
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct Argument<IntType, FloatType, BoolType> {
     pub name: Identifier,
-    pub value: Expression<IntType, FloatType, BoolType>,
+    pub arg_type: Expression<IntType, FloatType, BoolType>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -37,8 +37,8 @@ struct AstConversionState {
 pub struct GadtDefinition<IntType, FloatType, BoolType> {
     pub name: Identifier,
     pub universe: u64,
-    pub arguments: Vec<(Identifier, Expression<IntType, FloatType, BoolType>)>,
-    pub constructors: Vec<(Identifier, Expression<IntType, FloatType, BoolType>)>,
+    pub arguments: Vec<Argument<IntType, FloatType, BoolType>>,
+    pub constructors: Vec<Argument<IntType, FloatType, BoolType>>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -105,7 +105,12 @@ pub struct LetBind<IntType, FloatType, BoolType> {
 pub fn make_program<IntType, FloatType, BoolType>(
     parse_tree: &crate::parser::ProgramParseTree,
     funcs: ProgramInitFunctions<IntType, FloatType, BoolType>,
-) -> Program<IntType, FloatType, BoolType> {
+) -> Program<IntType, FloatType, BoolType>
+where
+    BoolType: Clone,
+    FloatType: Clone,
+    IntType: Clone,
+{
     let state = AstConversionState {
         next_lit_id: LitId(Some(0)),
         total: 0,
@@ -144,7 +149,12 @@ fn make_program_inner<IntType, FloatType, BoolType>(
     parse_tree: &crate::parser::ProgramParseTree,
     funcs: ProgramInitFunctions<IntType, FloatType, BoolType>,
     mut state: AstConversionState,
-) -> Program<IntType, FloatType, BoolType> {
+) -> Program<IntType, FloatType, BoolType>
+where
+    BoolType: Clone,
+    FloatType: Clone,
+    IntType: Clone,
+{
     let bindings: Vec<Binding<IntType, FloatType, BoolType>> = parse_tree
         .declarations
         .iter()
@@ -193,23 +203,19 @@ fn make_program_inner<IntType, FloatType, BoolType>(
         })
         .collect();
 
-    // let constructors: Vec<FunctionDefinition<IntType, FloatType, BoolType>> = gadts
-    //     .iter()
-    //     .flat_map(|gadt| {
-    //         gadt.constructors.iter().map(|x| FunctionDefinition {
-    //             name: x.0.clone(),
-    //             func_type: DependentFunctionType {
-    //                 universe: gadt.universe + 1,
-    //                 from_type: todo!(),
-    //                 to_type: todo!(),
-    //             },
-    //             body: todo!(),
-    //         })
-    //     })
-    //     .collect();
+    let constructors: Vec<Binding<IntType, FloatType, BoolType>> = gadts
+        .iter()
+        .flat_map(|gadt| {
+            gadt.constructors.iter().map(|x| Binding {
+                name: x.name.clone(),
+                elem_type: x.arg_type.clone(),
+                value: Definition::Instrinsic,
+            })
+        })
+        .collect();
 
     Program {
-        global_bindings: bindings,
+        global_bindings: bindings.into_iter().chain(constructors).collect(),
         test_cases,
         gadts,
         num_ids: state.next_lit_id.0.unwrap(),
@@ -327,7 +333,7 @@ fn make_argument<IntType, FloatType, BoolType>(
 ) -> Argument<IntType, FloatType, BoolType> {
     Argument {
         name: Identifier(value.varname.clone()),
-        value: make_expression(state, funcs, &value.vartype, differentiable),
+        arg_type: make_expression(state, funcs, &value.vartype, differentiable),
     }
 }
 
@@ -343,21 +349,17 @@ fn make_gadt<IntType, FloatType, BoolType>(
         arguments: value
             .arguments
             .iter()
-            .map(|x: &crate::parser::Argument| {
-                (
-                    Identifier(x.varname.to_string()),
-                    make_expression(state, funcs, &x.vartype, differentiable),
-                )
+            .map(|x: &crate::parser::Argument| Argument {
+                name: Identifier(x.varname.to_string()),
+                arg_type: make_expression(state, funcs, &x.vartype, differentiable),
             })
             .collect(),
         constructors: value
             .constructors
             .iter()
-            .map(|x: &crate::parser::Argument| {
-                (
-                    Identifier(x.varname.to_string()),
-                    make_expression(state, funcs, &x.vartype, differentiable),
-                )
+            .map(|x: &crate::parser::Argument| Argument {
+                name: Identifier(x.varname.to_string()),
+                arg_type: make_expression(state, funcs, &x.vartype, differentiable),
             })
             .collect(),
     }

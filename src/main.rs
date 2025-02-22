@@ -93,8 +93,6 @@ fn main() {
                 &soft_program,
             );
 
-            println!("test cases = {:?}", stuff);
-
             let grad: interpreter_soft::Gradient = stuff.into_iter().fold(
                 interpreter_soft::make_oneshot(soft_program.num_ids, crate::ast::LitId(None)),
                 |acc, x| acc + x.gradient,

@@ -34,12 +34,18 @@ fn harden_gadt(
         arguments: gadt
             .arguments
             .into_iter()
-            .map(|(ident, expr)| (ident, harden_expr(expr)))
+            .map(|arg| crate::ast::Argument {
+                name: arg.name,
+                arg_type: harden_expr(arg.arg_type),
+            })
             .collect(),
         constructors: gadt
             .constructors
             .into_iter()
-            .map(|(ident, expr)| (ident, harden_expr(expr)))
+            .map(|arg| crate::ast::Argument {
+                name: arg.name,
+                arg_type: harden_expr(arg.arg_type),
+            })
             .collect(),
     }
 }
@@ -64,7 +70,7 @@ fn harden_argument(
 ) -> crate::ast::Argument<i64, f64, bool> {
     crate::ast::Argument {
         name: arg.name,
-        value: harden_expr(arg.value),
+        arg_type: harden_expr(arg.arg_type),
     }
 }
 

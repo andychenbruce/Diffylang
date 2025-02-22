@@ -152,13 +152,13 @@ fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>,
             type_first,
             type_second,
         } => {
-            apply_gradient_expr(&mut type_first.value, grad);
+            apply_gradient_expr(&mut type_first.arg_type, grad);
             apply_gradient_expr(type_second, grad);
         }
         ast::Expression::Variable { ident: _ } => {}
         ast::Expression::Universe(_) => {}
         ast::Expression::DependentFunctionType { type_from, type_to } => {
-            apply_gradient_expr(&mut type_from.value, grad);
+            apply_gradient_expr(&mut type_from.arg_type, grad);
             apply_gradient_expr(type_to, grad);
         }
         ast::Expression::Lambda { input: _, body } => apply_gradient_expr(body, grad),

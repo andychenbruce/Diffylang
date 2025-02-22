@@ -1,5 +1,5 @@
 fn type_check<IntType, FloatType, BoolType>(
-    program: &super::Program<IntType, FloatType, BoolType>,
+    _program: &super::Program<IntType, FloatType, BoolType>,
 ) -> bool {
 
     

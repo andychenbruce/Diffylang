@@ -58,6 +58,10 @@ pub enum BuiltinFunc<IntType, FloatType, BoolType> {
 
     PartialAppBoolAnd(BoolType),
     PartialAppBoolOr(BoolType),
+
+    IfThenElse,
+    PartialAppIfThenElse1(BoolType),
+    PartialAppIfThenElse2(BoolType, Box<EvalVal<IntType, FloatType, BoolType>>),
 }
 
 #[derive(Clone)]
@@ -67,7 +71,7 @@ struct Env<'a, IntType, FloatType, BoolType> {
 }
 
 #[derive(Clone, Debug)]
-enum EnvVars<IntType, FloatType, BoolType> {
+pub enum EnvVars<IntType, FloatType, BoolType> {
     End,
     Rest {
         first: (super::Identifier, EvalVal<IntType, FloatType, BoolType>),
@@ -162,6 +166,7 @@ impl<
             "__and" => Some(EvalVal::BuiltinFunc(BuiltinFunc::BoolAnd)),
             "__or" => Some(EvalVal::BuiltinFunc(BuiltinFunc::BoolOr)),
             "__not" => Some(EvalVal::BuiltinFunc(BuiltinFunc::BoolNot)),
+            "__if" => Some(EvalVal::BuiltinFunc(BuiltinFunc::IfThenElse)),
 
             var_str => match self {
                 EnvVars::End => None,
@@ -238,7 +243,7 @@ where
             type_second,
         } => {
             let first_type =
-                eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), &type_first.value);
+                eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), &type_first.arg_type);
 
             let new_env: Env<IntType, FloatType, BoolType> = Env {
                 program: env.program,
@@ -258,7 +263,7 @@ where
         }
         super::Expression::DependentFunctionType { type_from, type_to } => {
             let from_type =
-                eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), &type_from.value);
+                eval::<IntType, FloatType, BoolType, E>(evaluator, env.clone(), &type_from.arg_type);
 
             let new_env: Env<IntType, FloatType, BoolType> = Env {
                 program: env.program,
@@ -326,9 +331,9 @@ where
 {
     match func {
         EvalVal::Lambda {
-            captured_environment,
-            input,
-            expr,
+            captured_environment: _,
+            input: _,
+            expr: _,
         } => {
             todo!()
         }
@@ -445,6 +450,17 @@ where
                 EvalVal::Bool(y) => EvalVal::Bool(evaluator.eval_or(x, y)),
                 _ => unreachable!(),
             },
+            BuiltinFunc::IfThenElse => match arg {
+                EvalVal::Bool(x) => EvalVal::BuiltinFunc(BuiltinFunc::PartialAppIfThenElse1(x)),
+                _ => unreachable!(),
+            },
+            BuiltinFunc::PartialAppIfThenElse1(x) => {
+                EvalVal::BuiltinFunc(BuiltinFunc::PartialAppIfThenElse2(x, Box::new(arg)))
+            }
+
+            BuiltinFunc::PartialAppIfThenElse2(x, true_expr) => {
+                evaluator.eval_if(x, *true_expr, arg)
+            }
         },
 
         _ => unreachable!(),
