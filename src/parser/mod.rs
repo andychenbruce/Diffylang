@@ -112,7 +112,7 @@ impl<'a> Tokens<'a> {
             "Π" => TokenNonParen::Pi,
             "Σ" => TokenNonParen::Sigma,
             "let" => TokenNonParen::Let,
-            "def" => TokenNonParen::Def,
+            "≡" => TokenNonParen::Def,
             "deftest" => TokenNonParen::Deftest,
             "defgadt" => TokenNonParen::Defgadt,
             _ => TokenNonParen::NonKeyword(name),
