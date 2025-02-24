@@ -1,11 +1,10 @@
 use crate::ast;
 
-pub const HARD_AST_INIT: ast::ProgramInitFunctions<i64, f64, bool> =
-    ast::ProgramInitFunctions {
-        make_int,
-        make_float,
-        make_bool,
-    };
+pub const HARD_AST_INIT: ast::ProgramInitFunctions<i64, f64, bool> = ast::ProgramInitFunctions {
+    make_int,
+    make_float,
+    make_bool,
+};
 
 fn make_int(x: i64, _: ast::LitId, _: usize) -> i64 {
     x
@@ -81,5 +80,4 @@ impl crate::ast::eval::Evaluator<i64, f64, bool> for HardEvaluator {
             false_branch
         }
     }
-
 }

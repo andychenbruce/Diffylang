@@ -41,6 +41,8 @@ pub enum ParseErrorReason {
     ArgDoesntStartWithColon,
     EmptyArg,
     TopLevelNotDeclaration,
+    ExpectedProductFirstVal,
+    ExpectedProductSecondVal,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +51,7 @@ enum TokenNonParen {
     Def,
     Defgadt,
     Deftest,
+    Comma,
     Colon,
     Let,
     Lambda,
@@ -108,6 +111,7 @@ impl<'a> Tokens<'a> {
 
         TokenVal::Other(match name.as_str() {
             ":" => TokenNonParen::Colon,
+            "," => TokenNonParen::Comma,
             "λ" => TokenNonParen::Lambda,
             "Π" => TokenNonParen::Pi,
             "Σ" => TokenNonParen::Sigma,
@@ -120,7 +124,7 @@ impl<'a> Tokens<'a> {
     }
 }
 
-impl<'a> Iterator for CharIter<'a> {
+impl Iterator for CharIter<'_> {
     type Item = char;
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.chars.next();
@@ -135,9 +139,9 @@ impl<'a> Iterator for CharIter<'a> {
     }
 }
 
-impl<'a> CharIter<'a> {
+impl CharIter<'_> {
     fn peek(&mut self) -> Option<char> {
-        self.chars.peek().map(|x| *x)
+        self.chars.peek().copied()
     }
     pub fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> Option<char> {
         match self.peek() {
@@ -151,7 +155,7 @@ impl<'a> CharIter<'a> {
     }
 }
 
-impl<'a> Iterator for Tokens<'a> {
+impl Iterator for Tokens<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -171,11 +175,11 @@ impl<'a> Iterator for Tokens<'a> {
                 self.token_parse_string()
             };
 
-            return Some(Token {
+            Some(Token {
                 val: token_val,
                 pos_start: start_pos,
                 pos_end: self.char_iter.curr_pos,
-            });
+            })
         } else {
             None
         }
@@ -212,13 +216,11 @@ fn make_token_tree(
 ) -> Result<Option<TokenTree>, ParseError> {
     if let Some(next_token) = tokens.next() {
         match next_token.val {
-            TokenVal::Other(tok) => {
-                return Ok(Some(TokenTree {
-                    val: TokenTreeVal::Leaf(tok),
-                    start_pos: next_token.pos_start,
-                    end_pos: next_token.pos_end,
-                }));
-            }
+            TokenVal::Other(tok) => Ok(Some(TokenTree {
+                val: TokenTreeVal::Leaf(tok),
+                start_pos: next_token.pos_start,
+                end_pos: next_token.pos_end,
+            })),
             TokenVal::ParenLeft => {
                 let mut children: Vec<TokenTree> = vec![];
 
@@ -262,16 +264,14 @@ fn make_token_tree(
                 }
             }
 
-            _ => {
-                return Err(ParseError {
-                    pos_start: next_token.pos_start,
-                    pos_end: next_token.pos_end,
-                    reason: ParseErrorReason::UnexpectedRightParenthesis,
-                })
-            }
+            _ => Err(ParseError {
+                pos_start: next_token.pos_start,
+                pos_end: next_token.pos_end,
+                reason: ParseErrorReason::UnexpectedRightParenthesis,
+            }),
         }
     } else {
-        return Ok(None);
+        Ok(None)
     }
 }
 
@@ -292,7 +292,7 @@ fn parse_top(token_tree: &TokenTree) -> Result<Declaration, ParseError> {
             reason: ParseErrorReason::StrayAtom,
         }),
         TokenTreeVal::Branch(vec) => match &vec
-            .get(0)
+            .first()
             .ok_or(ParseError {
                 pos_start: token_tree.start_pos,
                 pos_end: token_tree.end_pos,
@@ -330,7 +330,7 @@ fn parse_defgadt(
     end_pos: ParsePos,
     vec: &[TokenTree],
 ) -> Result<Declaration, ParseError> {
-    let name = parse_name(vec.get(0).ok_or(ParseError {
+    let name = parse_name(vec.first().ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedName,
@@ -346,11 +346,11 @@ fn parse_defgadt(
         reason: ParseErrorReason::ExpectedConstructors,
     })?)?;
 
-    return Ok(Declaration::GadtDef(GadtDefinition {
+    Ok(Declaration::Gadt(GadtDefinition {
         name,
         gadt_type,
         constructors,
-    }));
+    }))
 }
 
 fn parse_def(
@@ -358,7 +358,7 @@ fn parse_def(
     end_pos: ParsePos,
     vec: &[TokenTree],
 ) -> Result<Declaration, ParseError> {
-    let name = parse_name(vec.get(0).ok_or(ParseError {
+    let name = parse_name(vec.first().ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedName,
@@ -373,11 +373,11 @@ fn parse_def(
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedExpression,
     })?)?;
-    return Ok(Declaration::BindingDef(BindingDefinition {
+    Ok(Declaration::Binding(BindingDefinition {
         name,
         binding_type,
         func_body: body,
-    }));
+    }))
 }
 
 fn parse_deftest(
@@ -385,13 +385,13 @@ fn parse_deftest(
     end_pos: ParsePos,
     vec: &[TokenTree],
 ) -> Result<Declaration, ParseError> {
-    let body = parse_expr(vec.get(0).ok_or(ParseError {
+    let body = parse_expr(vec.first().ok_or(ParseError {
         pos_start: start_pos,
         pos_end: end_pos,
         reason: ParseErrorReason::ExpectedTestCaseExpression,
     })?)?;
 
-    Ok(Declaration::TestCaseDef(body))
+    Ok(Declaration::TestCase(body))
 }
 
 fn parse_leaf_name(s: &str) -> Expression {
@@ -411,7 +411,7 @@ fn parse_leaf_name(s: &str) -> Expression {
             _ => panic!("bad integer"),
         }
     } else {
-        return Expression::Variable(s.to_owned());
+        Expression::Variable(s.to_owned())
     }
 }
 
@@ -426,7 +426,7 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
             }),
         },
         TokenTreeVal::Branch(sub_trees) => {
-            let first = sub_trees.get(0).ok_or(ParseError {
+            let first = sub_trees.first().ok_or(ParseError {
                 pos_start: token_tree.start_pos,
                 pos_end: token_tree.end_pos,
                 reason: ParseErrorReason::EmptyExpression,
@@ -491,7 +491,8 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                             parse_expr(sub_trees.get(2).ok_or(ParseError {
                                 pos_start: token_tree.start_pos,
                                 pos_end: token_tree.end_pos,
-                                reason: ParseErrorReason::ExpectedDependentFunctionTypeToTypeExpression,
+                                reason:
+                                    ParseErrorReason::ExpectedDependentFunctionTypeToTypeExpression,
                             })?)?;
 
                         Ok(Expression::DependentFunctionType {
@@ -518,6 +519,25 @@ fn parse_expr(token_tree: &TokenTree) -> Result<Expression, ParseError> {
                             type_second: Box::new(second_type),
                         })
                     }
+                    TokenNonParen::Comma => {
+                        let first_val: Expression =
+                            parse_expr(sub_trees.get(1).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedProductFirstVal,
+                            })?)?;
+                        let second_val: Expression =
+                            parse_expr(sub_trees.get(2).ok_or(ParseError {
+                                pos_start: token_tree.start_pos,
+                                pos_end: token_tree.end_pos,
+                                reason: ParseErrorReason::ExpectedProductSecondVal,
+                            })?)?;
+
+                        Ok(Expression::Product {
+                            first_val: Box::new(first_val),
+                            second_val: Box::new(second_val),
+                        })
+                    }
                     _ => Err(ParseError {
                         pos_start: token_tree.start_pos,
                         pos_end: token_tree.end_pos,
@@ -541,7 +561,7 @@ fn parse_let_bindings(token_tree: &TokenTree) -> Result<Vec<LetBind>, ParseError
             pos_end: token_tree.end_pos,
             reason: ParseErrorReason::BindingsAreLeaf,
         }),
-        TokenTreeVal::Branch(vec) => vec.into_iter().map(parse_let_binding).collect(),
+        TokenTreeVal::Branch(vec) => vec.iter().map(parse_let_binding).collect(),
     }
 }
 
@@ -553,7 +573,7 @@ fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, ParseError> {
             reason: ParseErrorReason::BindingIsLeaf,
         }),
         TokenTreeVal::Branch(vec) => {
-            let name = parse_name(vec.get(0).ok_or(ParseError {
+            let name = parse_name(vec.first().ok_or(ParseError {
                 pos_start: token_tree.start_pos,
                 pos_end: token_tree.end_pos,
                 reason: ParseErrorReason::ExpectedName,
@@ -564,10 +584,10 @@ fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, ParseError> {
                 reason: ParseErrorReason::ExpectedLetBindingBody,
             })?)?;
 
-            return Ok(LetBind {
+            Ok(LetBind {
                 name,
                 value: Box::new(body),
-            });
+            })
         }
     }
 }
@@ -575,7 +595,7 @@ fn parse_let_binding(token_tree: &TokenTree) -> Result<LetBind, ParseError> {
 fn parse_arg(token_tree: &TokenTree) -> Result<Argument, ParseError> {
     match &token_tree.val {
         TokenTreeVal::Branch(vec) => {
-            let colon = vec.get(0).ok_or(ParseError {
+            let colon = vec.first().ok_or(ParseError {
                 pos_start: token_tree.start_pos,
                 pos_end: token_tree.end_pos,
                 reason: ParseErrorReason::EmptyArg,
@@ -599,10 +619,7 @@ fn parse_arg(token_tree: &TokenTree) -> Result<Argument, ParseError> {
                 reason: ParseErrorReason::ExpectedArgTypeExpression,
             })?)?;
 
-            Ok(Argument {
-                varname,
-                vartype,
-            })
+            Ok(Argument { varname, vartype })
         }
         TokenTreeVal::Leaf(_) => Err(ParseError {
             pos_start: token_tree.start_pos,
@@ -614,10 +631,9 @@ fn parse_arg(token_tree: &TokenTree) -> Result<Argument, ParseError> {
 
 fn parse_args(token_tree: &TokenTree) -> Result<Vec<Argument>, ParseError> {
     match &token_tree.val {
-        TokenTreeVal::Branch(vec) => Ok(vec
-            .into_iter()
-            .map(parse_arg)
-            .collect::<Result<Vec<_>, _>>()?),
+        TokenTreeVal::Branch(vec) => {
+            Ok(vec.iter().map(parse_arg).collect::<Result<Vec<_>, _>>()?)
+        }
         TokenTreeVal::Leaf(_) => Err(ParseError {
             pos_start: token_tree.start_pos,
             pos_end: token_tree.end_pos,
@@ -644,9 +660,9 @@ pub struct ProgramParseTree {
 
 #[derive(Clone, Debug)]
 pub enum Declaration {
-    BindingDef(BindingDefinition),
-    GadtDef(GadtDefinition),
-    TestCaseDef(Expression),
+    Binding(BindingDefinition),
+    Gadt(GadtDefinition),
+    TestCase(Expression),
 }
 
 #[derive(Clone, Debug)]
@@ -683,6 +699,10 @@ pub enum Expression {
         func: Box<Expression>,
         args: Vec<Expression>,
     },
+    Product {
+        first_val: Box<Expression>,
+        second_val: Box<Expression>,
+    },
 
     Lambda {
         input: Box<Argument>,
@@ -712,5 +732,5 @@ pub fn parse_program_from_file<P: AsRef<std::path::Path>>(
     let code = &std::fs::read_to_string(filename).unwrap();
     let tokens = Tokens::new(code);
     let trees = make_token_trees(&mut tokens.peekable())?;
-    return parse_program(trees);
+    parse_program(trees)
 }

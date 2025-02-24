@@ -43,14 +43,14 @@ impl core::ops::Add for Gradient {
     fn add(self, rhs: Self) -> Self::Output {
         assert!(self.values.len() == rhs.values.len());
 
-        return Gradient {
+        Gradient {
             values: self
                 .values
                 .iter()
                 .zip(rhs.values.iter())
                 .map(|(l, r)| l + r)
                 .collect(),
-        };
+        }
     }
 }
 
@@ -60,14 +60,14 @@ impl core::ops::Sub for Gradient {
     fn sub(self, rhs: Self) -> Self::Output {
         assert!(self.values.len() == rhs.values.len());
 
-        return Gradient {
+        Gradient {
             values: self
                 .values
                 .iter()
                 .zip(rhs.values.iter())
                 .map(|(l, r)| l - r)
                 .collect(),
-        };
+        }
     }
 }
 
@@ -75,9 +75,9 @@ impl core::ops::Mul<f64> for Gradient {
     type Output = Gradient;
 
     fn mul(self, rhs: f64) -> Self::Output {
-        return Gradient {
+        Gradient {
             values: self.values.iter().map(|x| x * rhs).collect(),
-        };
+        }
     }
 }
 
@@ -158,6 +158,13 @@ fn apply_gradient_expr(expr: &mut ast::Expression<SoftInt, SoftFloat, SoftBool>,
         }
         ast::Expression::Lambda { input: _, body } => apply_gradient_expr(body, grad),
         ast::Expression::Intrinsic => {}
+        ast::Expression::Product {
+            first_val,
+            second_val,
+        } => {
+            apply_gradient_expr(first_val, grad);
+            apply_gradient_expr(second_val, grad);
+        }
     }
 }
 

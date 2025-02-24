@@ -69,6 +69,10 @@ pub enum Expression<IntType, FloatType, BoolType> {
         type_from: Box<Argument<IntType, FloatType, BoolType>>,
         type_to: Box<Expression<IntType, FloatType, BoolType>>,
     },
+    Product {
+        first_val: Box<Expression<IntType, FloatType, BoolType>>,
+        second_val: Box<Expression<IntType, FloatType, BoolType>>,
+    },
 
     Integer(IntType, LitId),
     Float(FloatType, LitId),
@@ -97,7 +101,7 @@ enum TypeEnv<'a, IntType, FloatType, BoolType> {
     End,
 }
 
-impl<'a, IntType, FloatType, BoolType> TypeEnv<'a, IntType, FloatType, BoolType> {
+impl<IntType, FloatType, BoolType> TypeEnv<'_, IntType, FloatType, BoolType> {
     pub fn lookup_type(&self, name: &Identifier) -> Expression<IntType, FloatType, BoolType>
     where
         BoolType: Clone,
@@ -130,7 +134,7 @@ impl<'a, IntType, FloatType, BoolType> TypeEnv<'a, IntType, FloatType, BoolType>
                     if first.0 == name {
                         return first.1.clone();
                     }
-                    return rest.lookup_type(name);
+                    rest.lookup_type(name)
                 }
                 TypeEnv::End => panic!("unknown type: {}", name.0),
             },
@@ -184,7 +188,7 @@ impl<IntType, FloatType, BoolType> Expression<IntType, FloatType, BoolType> {
                     }
                     _ => todo!(),
                 }
-            },
+            }
             Expression::Integer(_, _) => Expression::Variable {
                 ident: Identifier("int".to_owned()),
             },
@@ -194,7 +198,10 @@ impl<IntType, FloatType, BoolType> Expression<IntType, FloatType, BoolType> {
             Expression::FuncApplicationMultipleArgs { func, args } => {
                 find_function_application_type(&func.get_type(env), args, env)
             }
-            Expression::ExprLetBinding { bindings, inner } => todo!(),
+            Expression::ExprLetBinding {
+                bindings: _,
+                inner: _,
+            } => todo!(),
             Expression::Lambda { input, body } => {
                 let new_env = TypeEnv::Next {
                     first: (&input.name, &input.arg_type),
@@ -208,6 +215,16 @@ impl<IntType, FloatType, BoolType> Expression<IntType, FloatType, BoolType> {
                     type_to: Box::new(body_type),
                 }
             }
+            Expression::Product {
+                first_val,
+                second_val,
+            } => Expression::DependentProductType {
+                type_first: Box::new(Argument {
+                    name: Identifier("__unused".to_owned()),
+                    arg_type: first_val.get_type(env),
+                }),
+                type_second: Box::new(second_val.get_type(env)),
+            },
         }
     }
 }
@@ -275,11 +292,9 @@ where
         .declarations
         .iter()
         .filter_map(|x| match x {
-            crate::parser::Declaration::BindingDef(f) => {
-                Some(make_definition(&mut state, &funcs, f))
-            }
-            crate::parser::Declaration::TestCaseDef(_) => None,
-            crate::parser::Declaration::GadtDef(_) => None,
+            crate::parser::Declaration::Binding(f) => Some(make_definition(&mut state, &funcs, f)),
+            crate::parser::Declaration::TestCase(_) => None,
+            crate::parser::Declaration::Gadt(_) => None,
         })
         .collect();
 
@@ -292,17 +307,17 @@ where
         .declarations
         .iter()
         .filter_map(|x| match x {
-            crate::parser::Declaration::TestCaseDef(t) => Some(make_expression(
+            crate::parser::Declaration::TestCase(t) => Some(make_expression(
                 &mut AstConversionState {
                     next_lit_id: LitId(None),
                     total: state.total,
                 },
                 &funcs,
-                &t,
+                t,
                 false,
             )),
-            crate::parser::Declaration::BindingDef(_) => None,
-            crate::parser::Declaration::GadtDef(_) => None,
+            crate::parser::Declaration::Binding(_) => None,
+            crate::parser::Declaration::Gadt(_) => None,
         })
         .collect();
 
@@ -310,9 +325,9 @@ where
         .declarations
         .iter()
         .filter_map(|x| match x {
-            crate::parser::Declaration::TestCaseDef(_) => None,
-            crate::parser::Declaration::BindingDef(_) => None,
-            crate::parser::Declaration::GadtDef(gadt_def) => Some(make_gadt(
+            crate::parser::Declaration::TestCase(_) => None,
+            crate::parser::Declaration::Binding(_) => None,
+            crate::parser::Declaration::Gadt(gadt_def) => Some(make_gadt(
                 &mut AstConversionState {
                     next_lit_id: LitId(None),
                     total: state.total,
@@ -402,7 +417,7 @@ fn make_expression<IntType, FloatType, BoolType>(
         }
         crate::parser::Expression::FunctionApplicationMultipleArgs { ref func, ref args } => {
             Expression::FuncApplicationMultipleArgs {
-                func: Box::new(make_expression(state, funcs, &func, true)),
+                func: Box::new(make_expression(state, funcs, func, true)),
                 args: args
                     .clone()
                     .into_iter()
@@ -422,9 +437,16 @@ fn make_expression<IntType, FloatType, BoolType>(
 
             Expression::ExprLetBinding {
                 bindings,
-                inner: Box::new(make_expression(state, funcs, &inner, differentiable)),
+                inner: Box::new(make_expression(state, funcs, inner, differentiable)),
             }
         }
+        crate::parser::Expression::Product {
+            first_val,
+            second_val,
+        } => Expression::Product {
+            first_val: Box::new(make_expression(state, funcs, first_val, differentiable)),
+            second_val: Box::new(make_expression(state, funcs, second_val, differentiable)),
+        },
         crate::parser::Expression::DependentProductType {
             type_first,
             type_second,
@@ -489,20 +511,18 @@ where
     IntType: Clone + std::fmt::Debug,
 {
     match args.split_first() {
-        Some((first_arg, rest_args)) => {
-            match func_type {
-                Expression::DependentFunctionType { type_from, type_to } => {
-                    assert!(types_are_equal(
-                        &type_from.arg_type,
-                        &first_arg.get_type(env),
-                        env,
-                    ));
+        Some((first_arg, rest_args)) => match func_type {
+            Expression::DependentFunctionType { type_from, type_to } => {
+                assert!(types_are_equal(
+                    &type_from.arg_type,
+                    &first_arg.get_type(env),
+                    env,
+                ));
 
-                    find_function_application_type(&type_to, rest_args, env)
-                }
-                x => panic!("invalid function application: {:?}", x),
+                find_function_application_type(type_to, rest_args, env)
             }
-        }
+            x => panic!("invalid function application: {:?}", x),
+        },
         None => func_type.clone(),
     }
 }

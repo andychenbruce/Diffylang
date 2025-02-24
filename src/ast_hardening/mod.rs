@@ -108,5 +108,12 @@ fn harden_expr(
             body: Box::new(harden_expr(*body)),
         },
         crate::ast::Expression::Intrinsic => crate::ast::Expression::Intrinsic,
+        crate::ast::Expression::Product {
+            first_val,
+            second_val,
+        } => crate::ast::Expression::Product {
+            first_val: Box::new(harden_expr(*first_val)),
+            second_val: Box::new(harden_expr(*second_val)),
+        },
     }
 }

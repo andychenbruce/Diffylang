@@ -12,9 +12,9 @@ pub enum EvalVal<IntType, FloatType, BoolType> {
         input: super::Identifier,
         expr: super::Expression<IntType, FloatType, BoolType>,
     },
-    DependentProduct {
-        first: Box<EvalVal<IntType, FloatType, BoolType>>,
-        second: Box<EvalVal<IntType, FloatType, BoolType>>,
+    Product {
+        first_val: Box<EvalVal<IntType, FloatType, BoolType>>,
+        second_val: Box<EvalVal<IntType, FloatType, BoolType>>,
     },
     DependentProductType {
         first_type: Box<EvalVal<IntType, FloatType, BoolType>>,
@@ -25,6 +25,39 @@ pub enum EvalVal<IntType, FloatType, BoolType> {
         type_from: Box<EvalVal<IntType, FloatType, BoolType>>,
     },
     BuiltinFunc(BuiltinFunc<IntType, FloatType, BoolType>),
+}
+
+impl<IntType, FloatType, BoolType> std::fmt::Display for EvalVal<IntType, FloatType, BoolType>
+where
+    IntType: core::fmt::Display + core::fmt::Debug,
+    FloatType: core::fmt::Display + core::fmt::Debug,
+    BoolType: core::fmt::Display + core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvalVal::Int(x) => write!(f, "{}", x),
+            EvalVal::Float(x) => write!(f, "{}", x),
+            EvalVal::Bool(x) => write!(f, "{}", x),
+            EvalVal::Universe(x) => write!(f, "{}u", x),
+            EvalVal::Lambda {
+                captured_free_variables: _,
+                input,
+                expr,
+            } => write!(f, "λ {} {:?}", input.0, expr),
+            EvalVal::Product {
+                first_val,
+                second_val,
+            } => write!(f, "({}, {})", first_val, second_val),
+            EvalVal::DependentProductType {
+                first_type,
+                second_type,
+            } => write!(f, "Σ {} {}", first_type, second_type),
+            EvalVal::DependentFunctionType { type_to, type_from } => {
+                write!(f, "Π {} {}", type_to, type_from)
+            }
+            EvalVal::BuiltinFunc(builtin_func) => write!(f, "{:?}", builtin_func),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -106,14 +139,13 @@ pub trait Evaluator<IntType, FloatType, BoolType> {
 }
 
 pub fn run_function<
-    'a,
     IntType: Clone + core::fmt::Debug,
     FloatType: Clone + core::fmt::Debug,
     BoolType: Clone + core::fmt::Debug,
     E,
 >(
     evaluator: &E,
-    program: &'a super::Program<IntType, FloatType, BoolType>,
+    program: &super::Program<IntType, FloatType, BoolType>,
     func_name: &str,
     arguments: Vec<EvalVal<IntType, FloatType, BoolType>>,
 ) -> EvalVal<IntType, FloatType, BoolType>
@@ -130,12 +162,10 @@ where
 }
 
 impl<
-        'a,
-        'b,
         IntType: Clone + core::fmt::Debug,
         FloatType: Clone + core::fmt::Debug,
         BoolType: Clone + core::fmt::Debug,
-    > Env<'a, 'b, IntType, FloatType, BoolType>
+    > Env<'_, '_, IntType, FloatType, BoolType>
 {
     fn lookup_expr<E>(
         &self,
@@ -159,11 +189,10 @@ impl<
     }
 }
 impl<
-        'a,
         IntType: Clone + core::fmt::Debug,
         FloatType: Clone + core::fmt::Debug,
         BoolType: Clone + core::fmt::Debug,
-    > EnvVars<'a, IntType, FloatType, BoolType>
+    > EnvVars<'_, IntType, FloatType, BoolType>
 {
     fn lookup(
         &self,
@@ -202,15 +231,13 @@ impl<
 }
 
 fn eval<
-    'a,
-    'b,
     IntType: Clone + core::fmt::Debug,
     FloatType: Clone + core::fmt::Debug,
     BoolType: Clone + core::fmt::Debug,
     E,
 >(
     evaluator: &E,
-    env: &Env<'a, 'b, IntType, FloatType, BoolType>,
+    env: &Env<'_, '_, IntType, FloatType, BoolType>,
     expr: &super::Expression<IntType, FloatType, BoolType>,
 ) -> EvalVal<IntType, FloatType, BoolType>
 where
@@ -299,6 +326,13 @@ where
             }
         }
         super::Expression::Intrinsic => todo!(),
+        super::Expression::Product {
+            first_val,
+            second_val,
+        } => EvalVal::Product {
+            first_val: Box::new(eval(evaluator, env, first_val)),
+            second_val: Box::new(eval(evaluator, env, second_val)),
+        },
     }
 }
 
@@ -559,7 +593,7 @@ fn get_free_variables<
 
             type_first_free_variables
                 .union(&type_second_free_variables)
-                .map(|x| x.clone())
+                .cloned()
                 .collect()
         }
         super::Expression::DependentFunctionType { type_from, type_to } => {
@@ -570,7 +604,7 @@ fn get_free_variables<
 
             type_from_free_variables
                 .union(&type_to_free_variables)
-                .map(|x| x.clone())
+                .cloned()
                 .collect()
         }
         super::Expression::Integer(_, _) => std::collections::HashSet::new(),
@@ -581,17 +615,12 @@ fn get_free_variables<
             let args_free_vars = args
                 .iter()
                 .fold(std::collections::HashSet::new(), |acc, var| {
-                    acc.union(&get_free_variables(var))
-                        .map(|x| x.clone())
-                        .collect()
+                    acc.union(&get_free_variables(var)).cloned().collect()
                 });
 
             let function_free_vars = get_free_variables(func);
 
-            args_free_vars
-                .union(&function_free_vars)
-                .map(|x| x.clone())
-                .collect()
+            args_free_vars.union(&function_free_vars).cloned().collect()
         }
         super::Expression::ExprLetBinding { bindings, inner } => {
             let binding_free_vars = get_let_binds_free_vars(bindings.as_slice());
@@ -604,10 +633,7 @@ fn get_free_variables<
                 );
             }
 
-            binding_free_vars
-                .union(&body_free_vars)
-                .map(|x| x.clone())
-                .collect()
+            binding_free_vars.union(&body_free_vars).cloned().collect()
         }
         super::Expression::Lambda { input, body } => {
             let mut body_free_vars = get_free_variables(body);
@@ -615,6 +641,15 @@ fn get_free_variables<
             assert!(body_free_vars.remove(&input.name));
 
             body_free_vars
+        }
+        super::Expression::Product {
+            first_val,
+            second_val,
+        } => {
+            let first_free_vars = get_free_variables(first_val);
+            let second_free_vars = get_free_variables(second_val);
+
+            first_free_vars.union(&second_free_vars).cloned().collect()
         }
     }
 }
@@ -704,10 +739,7 @@ fn get_let_binds_free_vars<
 
             assert!(rest_free_vars.remove(&first_binding.ident));
 
-            own_free_vars
-                .union(&rest_free_vars)
-                .map(|x| x.clone())
-                .collect()
+            own_free_vars.union(&rest_free_vars).cloned().collect()
         }
         None => std::collections::HashSet::new(),
     }

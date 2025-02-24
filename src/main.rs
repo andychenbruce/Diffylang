@@ -24,7 +24,6 @@ fn main() {
                     todo!("print multi line errors")
                 }
 
-
                 if line_num + 1 == err.pos_start.line {
                     println!("{}", line);
                 }
@@ -43,10 +42,8 @@ fn main() {
                     println!("{:?}", err.reason);
                     println!();
                 }
-                if line_num > 0 {
-                    if line_num - 1 == err.pos_start.line {
-                        println!("{}", line);
-                    }
+                if line_num > 0 && line_num - 1 == err.pos_start.line {
+                    println!("{}", line);
                 }
             }
 
